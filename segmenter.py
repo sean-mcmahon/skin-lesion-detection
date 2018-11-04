@@ -31,11 +31,14 @@ def dice(pred, targs):
     pred = (pred > 0).float()
     return 2. * (pred*targs).sum() / (pred+targs).sum()
 
+def dice_n(pred, targs):
+    pred = (pred > 0).astype(float)
+    return 2. * (pred*targs).sum() / (pred+targs).sum()
 
 def jaccard(pred, targs):
-    # iou = TP / (TP + FP + FN)
-    pred = (pred > 0).float()
-    return metrics.jaccard_similarity_score(targs, pred)
+    # iou = TP / (TP+FP+FN)
+    pred = (pred > 0).astype(float)
+
 
 
 class SaveFeatures():
@@ -113,8 +116,9 @@ def plot_loss(train_losses, val_losses, rec_metrics, num_ep, epoch_iters):
     ax[1].set_ylim(bottom=min(0.5, min(rec_metrics)))
     ax[1].grid()
 
-def plot_preds(x,y,py):
-    fig, axes = plt.subplots(5, 6, figsize=(12, 10))
+
+def plot_preds(x, y, py, splots=(5, 6), fsize=(12, 10)):
+    fig, axes = plt.subplots(*splots, figsize=fsize)
     for i, ax in enumerate(axes.flat):
         if i % 2 == 0:
             ax = show_img(x[i], ax=ax)
@@ -127,25 +131,38 @@ def plot_preds(x,y,py):
     plt.tight_layout(pad=0.1)
 
 
-def plot_data(x, y):
-    fig, axes = plt.subplots(5, 6, figsize=(12, 10))
+def plot_img_n_preds(x, py, splots=(5, 6), fsize=(12, 10)):
+    fig, axes = plt.subplots(*splots, figsize=fsize)
+    for i, ax in enumerate(axes.flat):
+        if i % 2 == 0:
+            ax = show_img(x[i], ax=ax)
+            # show_img(y[i], ax=ax, alpha=0.3)
+            ax.set_title(f'Input Image {i}')
+        else:
+            ax = show_img(x[i-1], ax=ax)
+            show_img(py[i-1] > 0, ax=ax, alpha=0.3)
+            ax.set_title(f'Segmentation (yellow) {i-1}')
+    plt.tight_layout(pad=0.1)
+
+def plot_data(x, y, title='Ground Truth', splots=(5,6), fsize=(12,10)):
+    fig, axes = plt.subplots(*splots, figsize=fsize)
     for i, ax in enumerate(axes.flat):
             ax = show_img(x[i], ax=ax)
             show_img(y[i], ax=ax, alpha=0.3)
-            ax.set_title(f'Ground Truth {i}')
+            ax.set_title(f'{title} {i}')
     plt.tight_layout(pad=0.1)
 
 
-def g_fns(fpath, ext):
+def g_fns(fpath, ext='.png'):
     return np.array(sorted([f for f in fpath.glob('*'+ext)]))
 
 
-def im_hist(fn, n=None):
-    nn = n if n is not None else ''
+def im_hist(fn, name=''):
     sizes = [PIL.Image.open(x).size for x in fn]
     row_sz, col_sz = list(zip(*sizes))
     plt.hist(row_sz)
-    plt.title(nn + ' Row Distributions')
+    plt.title(name + ' Row Distributions')
     plt.figure()
     plt.hist(col_sz)
-    plt.title(nn + ' Col Distributions')
+    plt.title(name + ' Col Distributions')
+    print(f'Min row size {min(row_sz)}; Min col size {min(col_sz)}')

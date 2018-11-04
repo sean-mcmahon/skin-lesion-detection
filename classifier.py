@@ -6,8 +6,10 @@ import sklearn.metrics as metrics
 def rand_by_mask(mask, preds, mpl=4): 
     return np.random.choice(np.where(mask)[0], min(len(preds), mpl), replace=False)
 
+
 def rand_by_correct(is_correct, preds, val_y): 
     return rand_by_mask((preds == val_y)==is_correct, preds)
+
 
 def plots(ims, figsize=(12,6), rows=1, titles=None):
     f = plt.figure(figsize=figsize)
@@ -16,6 +18,7 @@ def plots(ims, figsize=(12,6), rows=1, titles=None):
         sp.axis('Off')
         if titles is not None: sp.set_title(titles[i], fontsize=16)
         plt.imshow(ims[i])
+
 
 def sample_ims(path, c, data_it, numimgs=9, figsize=(24, 12)):
     ys = data_it.trn_y
@@ -29,6 +32,7 @@ def sample_ims(path, c, data_it, numimgs=9, figsize=(24, 12)):
     plots(ims, figsize=figsize, rows=r, titles=[
           "Im Id: {}".format(i) for i in idm])
     plt.suptitle(tt, fontsize=24)
+
 
 def load_img_id(path, ds, idx): 
     return np.array(PIL.Image.open(str(path / ds.fnames[idx])))
@@ -62,7 +66,7 @@ def load_csv_labels(csv_, folder='ISBI2016_ISIC_Part3_Test_Data', s='.jpg'):
 def run_test(learner, ts=False, test_csv=None, sf=False):
     '''
     Generate values for printing or plotting the three metrics:
-    confusipon matrix (cm)
+    confusion matrix (cm)
     ROC curve values
     Accuracy value
     
@@ -73,7 +77,6 @@ def run_test(learner, ts=False, test_csv=None, sf=False):
         y = load_csv_labels(csv_=test_csv)
     probs = np.exp(log_preds).mean(axis=0)  # average of TTA
     final_preds = np.argmax(probs, 1)
-#     set_trace()
     # accuracy
     acc = metrics.accuracy_score(y, final_preds)
     print(f'Accuracy = %0.2f' % acc)
