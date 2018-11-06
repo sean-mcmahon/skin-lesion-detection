@@ -72,6 +72,12 @@ def run_test(learner, ts=False, test_csv=None, sf=False):
     
     Should work for binary and multi-task classification problems
     '''
+    if ts and test_csv is None:
+        raise ValueError(
+            'Need if running on testset, provide a test_csv file for labels')
+    if ts and not os.path.isfile(str(test_csv)): 
+        raise FileNotFoundError(
+            f'test_csv does not exist - "{test_csv}"')
     log_preds, y = learner.TTA(is_test=ts)
     if ts and np.all(y == 0):
         y = load_csv_labels(csv_=test_csv)

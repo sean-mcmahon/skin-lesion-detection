@@ -101,6 +101,15 @@ class UnetModel():
         return lgs + [children(self.model)[1:]]
 
 
+def build_unet(backbone):
+    cut, lr_cut = model_meta[backbone]
+    m_base = get_base(backbone, cut)
+    unet = Unet34(m_base)
+    # to_gpu will put model on gpu if one is available
+    return to_gpu(unet)
+
+
+
 def plot_loss(train_losses, val_losses, rec_metrics, num_ep, epoch_iters):
     fig, ax = plt.subplots(2, 1, figsize=(8, 12))
     ax[0].grid()
