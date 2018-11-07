@@ -3,7 +3,7 @@ from fastai.dataset import *
 import sklearn.metrics as metrics
 
 
-def show_img(im, figsize=None, ax=None, alpha=None):
+def show_img(im, figsize=(5,5), ax=None, alpha=None):
     if not ax:
         fig, ax = plt.subplots(figsize=figsize)
     ax.imshow(im, alpha=alpha)
