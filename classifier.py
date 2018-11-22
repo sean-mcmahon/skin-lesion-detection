@@ -120,3 +120,101 @@ def performance_figs(classes, cm, roc_auc, fpr, tpr):
         plt.title('ROC for {} id {}'.format(classes[i], i))
         plt.legend(loc="lower right")
         plt.show()
+
+
+class Trainer():
+
+    def __init__(self, path, arch, sz, bs, trn_csv, aug_tfms=transforms_top_down,
+                  train_folder='', test_folder=None, val_idx=None, test_csv=None, lr=1e-2, sn=None, num_workers=8):
+        self.arch = arch
+        self.dlr = lr
+        self.test_csv = test_csv
+        if sn is None:
+            self.sn = 'train_' + self.arch.__name__
+        else:
+            self.sn = sn
+        print(f'Saving model as "{self.sn}"')
+
+        # Dataset augmentations
+        tfms = tfms_from_model(arch, sz, aug_tfms=transforms_top_down)
+        # The dataloader, used for training and evaluation, has numerous useful functions for:
+        # loading data, preprocessing, batching, obtaining basic stats, and more
+        self.data = ImageClassifierData.from_csv(path, train_folder, trn_csv, tfms=tfms,
+                                                 suffix='', bs=bs, test_name=test_folder, val_idxs=val_idx, num_workers=num_workers)
+
+        print('Dataset has: {} classes'.format(self.data.classes))
+        self.learn = ConvLearner.pretrained(
+            self.arch, self.data, precompute=True)
+
+    @classmethod
+    def from_data_loader(self, data_cls, arch, test_csv=None, prec=True, lr=1e-2, sn=None):
+        self.data = data_cls
+        self.arch = arch
+        self.dlr = lr
+        self.test_csv = test_csv
+        if sn is None:
+            self.sn = 'train_' + self.arch.__name__
+        else:
+            self.sn = sn
+        print('Dataset has: {} classes'.format(self.data.classes))
+        self.learn = ConvLearner.pretrained(
+            self.arch, self.data, precompute=prec)
+
+    def lr_find(self, sf=True):
+        lrf = self.learn.lr_find()
+        if sf: self.learn.sched.plot()
+        return lrf
+
+    def set_lr(self, lr):
+        self.dlr = lr
+
+    def init_fit(self, name=None):
+        sn = name if name else self.sn
+        self.learn.fit(self.dlr, 4)
+        self.learn.fit(self.dlr, 3, cycle_len=1)
+        self.learn.save(sn)
+        print('Saved weights as "{}"'.format(sn))
+
+    def inter_fit(self, name=None):
+        sn = name if name else self.sn
+        self.learn.precompute = False
+        self.learn.fit(self.dlr, 2, cycle_len=1, cycle_mult=2)
+        self.learn.save(sn)
+        print('Saved weights as "{}"'.format(sn))
+
+    def final_fit(self, name=None):
+        sn = name if name else self.sn
+        self.learn.unfreeze()
+        lrs = np.array([self.dlr // 100, self.dlr // 10, self.dlr])
+        self.learn.fit(lrs, 5, cycle_len=3)
+        self.learn.save(sn)
+        print('Saved weights as "{}"'.format(sn))
+        
+    def test_val(self):
+        vf_preds, vy, vacc, vcm, vroc_auc, vfpr, vtpr = run_test(self.learn, sf=True)
+
+    def test_eval(self, t_csv=None):
+        if t_csv: self.test_csv = t_csv
+        if self.test_csv is None:
+            print('no test labels given')
+            return
+        vf_preds, vy, vacc, vcm, vroc_auc, vfpr, vtpr = run_test(self.learn, ts=True, sf=True, test_csv=self.test_csv)
+
+    def train(self, sn=None, lr=None):
+        if lr: self.set_lr(lr)
+        if sn: self.sn = sn
+        
+        self.init_fit(self.sn + '_1')
+        print('-'*50)
+        self.test_val()
+        self.dlr = self.dlr // 2
+        self.inter_fit(self.sn + '_2')
+        self.test_val()
+        print('-'*50)
+        self.final_fit(self.sn + '_2')
+        self.test_val()
+        print('-'*50)
+        self.test_eval()
+
+    def load(self, fn):
+        self.learn.load(fn)
