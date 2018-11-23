@@ -122,7 +122,7 @@ def performance_figs(classes, cm, roc_auc, fpr, tpr):
         plt.show()
 
 
-class Trainer():
+class ClassifierTrainer():
 
     def __init__(self, path, arch, sz, bs, trn_csv, aug_tfms=transforms_top_down,
                   train_folder='', test_folder=None, val_idx=None, test_csv=None, lr=1e-2, sn=None, num_workers=8):
@@ -185,7 +185,7 @@ class Trainer():
     def final_fit(self, name=None):
         sn = name if name else self.sn
         self.learn.unfreeze()
-        lrs = np.array([self.dlr // 100, self.dlr // 10, self.dlr])
+        lrs = np.array([self.dlr / 100, self.dlr / 10, self.dlr])
         self.learn.fit(lrs, 5, cycle_len=3)
         self.learn.save(sn)
         print('Saved weights as "{}"'.format(sn))
@@ -207,7 +207,7 @@ class Trainer():
         self.init_fit(self.sn + '_1')
         print('-'*50)
         self.test_val()
-        self.dlr = self.dlr // 2
+        self.dlr = self.dlr / 2
         self.inter_fit(self.sn + '_2')
         self.test_val()
         print('-'*50)
@@ -218,3 +218,5 @@ class Trainer():
 
     def load(self, fn):
         self.learn.load(fn)
+
+
