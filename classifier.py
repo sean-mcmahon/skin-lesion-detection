@@ -59,11 +59,13 @@ def plot_val_with_title(d, probs, preds, idxs, title):
 
 def load_csv_labels(csv_, folder='ISBI2016_ISIC_Part3_Test_Data', s='.jpg'):
     _, y, _ = csv_source(folder, csv_, suffix=s)
-    print('Loading ys from csv; shape {}; vals {}'.format(y.shape, np.unique(y)))
+    print('Loading ys from csv; shape {}; vals {}; in folder "{}"'.format(
+        y.shape, np.unique(y), folder))
     return y
 
 
-def run_test(learner, ts=False, test_csv=None, sf=False):
+def run_test(learner, ts=False, test_csv=None, sf=False,
+             tta=True, test_folder='ISBI2016_ISIC_Part3_Test_Data'):
     '''
     Generate values for printing or plotting the three metrics:
     confusion matrix (cm)
@@ -78,10 +80,16 @@ def run_test(learner, ts=False, test_csv=None, sf=False):
     if ts and not os.path.isfile(str(test_csv)): 
         raise FileNotFoundError(
             f'test_csv does not exist - "{test_csv}"')
-    log_preds, y = learner.TTA(is_test=ts)
+    if tta:
+        log_preds, y = learner.TTA(is_test=ts)
+        probs = np.exp(log_preds).mean(axis=0)  # average of TTA
+    else:
+        dl1 = learner.data.test_dl if ts else learner.data.val_dl
+        log_preds, y = predict_with_targs(learner.model, dl1)
+        probs = np.exp(log_preds)
     if ts and np.all(y == 0):
-        y = load_csv_labels(csv_=test_csv)
-    probs = np.exp(log_preds).mean(axis=0)  # average of TTA
+        y = load_csv_labels(csv_=test_csv, folder=test_folder)
+    
     final_preds = np.argmax(probs, 1)
     # accuracy
     acc = metrics.accuracy_score(y, final_preds)
@@ -125,9 +133,11 @@ def performance_figs(classes, cm, roc_auc, fpr, tpr):
 class ClassifierTrainer():
 
     def __init__(self, path, arch, sz, bs, trn_csv, aug_tfms=transforms_top_down,
-                  train_folder='', test_folder=None, val_idx=None, test_csv=None, lr=1e-2, sn=None, num_workers=8):
+                  train_folder='', test_folder=None, val_idx=None, test_csv=None,
+                 lr=1e-2, sn=None, num_workers=8, precom=True):
         self.arch = arch
         self.dlr = lr
+        self.test_folder = test_folder
         self.test_csv = test_csv
         if sn is None:
             self.sn = 'train_' + self.arch.__name__
@@ -140,11 +150,12 @@ class ClassifierTrainer():
         # The dataloader, used for training and evaluation, has numerous useful functions for:
         # loading data, preprocessing, batching, obtaining basic stats, and more
         self.data = ImageClassifierData.from_csv(path, train_folder, trn_csv, tfms=tfms,
-                                                 suffix='', bs=bs, test_name=test_folder, val_idxs=val_idx, num_workers=num_workers)
-
+                                                 suffix='', bs=bs, test_name=self.test_folder,
+                                                 val_idxs=val_idx, num_workers=num_workers)
+        self.data.test_ds.fnames = sorted(self.data.test_ds.fnames)
         print('Dataset has: {} classes'.format(self.data.classes))
         self.learn = ConvLearner.pretrained(
-            self.arch, self.data, precompute=True)
+            self.arch, self.data, precompute=precom)
 
     @classmethod
     def from_data_loader(self, data_cls, arch, test_csv=None, prec=True, lr=1e-2, sn=None):
@@ -170,35 +181,44 @@ class ClassifierTrainer():
 
     def init_fit(self, name=None):
         sn = name if name else self.sn
-        self.learn.fit(self.dlr, 4)
-        self.learn.fit(self.dlr, 3, cycle_len=1)
+        self.learn.fit(self.dlr, 2)
+        self.learn.fit(self.dlr, 2, cycle_len=1)
+        if self.learn.precompute:
+            self.learn.precompute = False
+            self.learn.fit(self.dlr, 1)
         self.learn.save(sn)
         print('Saved weights as "{}"'.format(sn))
 
     def inter_fit(self, name=None):
         sn = name if name else self.sn
         self.learn.precompute = False
-        self.learn.fit(self.dlr, 2, cycle_len=1, cycle_mult=2)
+        self.learn.fit(self.dlr, 3, cycle_len=1, cycle_mult=2)
         self.learn.save(sn)
         print('Saved weights as "{}"'.format(sn))
 
     def final_fit(self, name=None):
+        wd = 5e-4
         sn = name if name else self.sn
         self.learn.unfreeze()
         lrs = np.array([self.dlr / 100, self.dlr / 10, self.dlr])
-        self.learn.fit(lrs, 5, cycle_len=3)
+        self.learn.fit(lrs, 5, cycle_len=3, wds=wd)
         self.learn.save(sn)
         print('Saved weights as "{}"'.format(sn))
         
-    def test_val(self):
-        vf_preds, vy, vacc, vcm, vroc_auc, vfpr, vtpr = run_test(self.learn, sf=True)
+    def test_val(self, tta=True, sf=True):
+        *res, = run_test(self.learn, sf=sf, tta=tta)
+        return res
 
-    def test_eval(self, t_csv=None):
+    def test_eval(self, t_csv=None, tta=True, sf=True):
         if t_csv: self.test_csv = t_csv
+        # self.check_test_names()
         if self.test_csv is None:
             print('no test labels given')
             return
-        vf_preds, vy, vacc, vcm, vroc_auc, vfpr, vtpr = run_test(self.learn, ts=True, sf=True, test_csv=self.test_csv)
+        *res, = run_test(
+            self.learn, ts=True, sf=sf, test_csv=self.test_csv,
+            test_folder=self.test_folder, tta=tta)
+        return res
 
     def train(self, sn=None, lr=None):
         if lr: self.set_lr(lr)
@@ -216,7 +236,15 @@ class ClassifierTrainer():
         print('-'*50)
         self.test_eval()
 
-    def load(self, fn):
+    def load(self, fn, pc=False):
+        # if precompute set to True b default
+        # but when loading models without precomute, it needs to be false.
+        self.learn.precompute = pc
         self.learn.load(fn)
 
-
+    def check_test_names(self, suf='.*jpg'):
+        fnames, _, _ = csv_source(self.test_folder, self.test_csv, suffix=suf)
+        test_filenames = self.learn.data.test_ds.fnames
+        if fnames != test_filenames:
+            es = 'Testset file names do no match! Try sorting "self.learn.data.test_ds.fnames"'
+            raise Exception(RuntimeError(es))

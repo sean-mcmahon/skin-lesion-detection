@@ -166,8 +166,11 @@ def g_fns(fpath, ext='.png'):
     return np.array(sorted([f for f in fpath.glob('*'+ext)]))
 
 
-def im_hist(fn, name=''):
-    sizes = [PIL.Image.open(x).size for x in fn]
+def im_hist(fn, name='', path=None):
+    if path:
+        sizes = [PIL.Image.open(os.path.join(path, x)).size for x in fn]
+    else:
+        sizes = [PIL.Image.open(x).size for x in fn]
     row_sz, col_sz = list(zip(*sizes))
     plt.hist(row_sz)
     plt.title(name + ' Row Distributions')
