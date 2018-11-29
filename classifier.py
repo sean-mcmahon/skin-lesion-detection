@@ -192,7 +192,7 @@ class ClassifierTrainer():
     def inter_fit(self, name=None):
         sn = name if name else self.sn
         self.learn.precompute = False
-        self.learn.fit(self.dlr, 3, cycle_len=1, cycle_mult=2)
+        self.learn.fit(self.dlr, 2, cycle_len=1, cycle_mult=2)
         self.learn.save(sn)
         print('Saved weights as "{}"'.format(sn))
 
@@ -201,17 +201,18 @@ class ClassifierTrainer():
         sn = name if name else self.sn
         self.learn.unfreeze()
         lrs = np.array([self.dlr / 100, self.dlr / 10, self.dlr])
+        self.learn.fit(lrs, 3, cycle_len=1, cycle_mult=2, wds=wd)
         self.learn.fit(lrs, 5, cycle_len=3, wds=wd)
         self.learn.save(sn)
         print('Saved weights as "{}"'.format(sn))
         
-    def test_val(self, tta=True, sf=True):
+    def test_val(self, tta=False, sf=False):
         *res, = run_test(self.learn, sf=sf, tta=tta)
         return res
 
-    def test_eval(self, t_csv=None, tta=True, sf=True):
+    def test_eval(self, t_csv=None, tta=False, sf=False):
         if t_csv: self.test_csv = t_csv
-        # self.check_test_names()
+        self.check_test_names()
         if self.test_csv is None:
             print('no test labels given')
             return
@@ -227,14 +228,15 @@ class ClassifierTrainer():
         self.init_fit(self.sn + '_1')
         print('-'*50)
         self.test_val()
-        self.dlr = self.dlr / 2
         self.inter_fit(self.sn + '_2')
         self.test_val()
+        self.test_eval()
         print('-'*50)
-        self.final_fit(self.sn + '_2')
+        self.set_lr(self.dlr / 2)
+        self.final_fit(self.sn + '_3')
         self.test_val()
         print('-'*50)
-        self.test_eval()
+        self.test_eval(tta=True, sf=True)
 
     def load(self, fn, pc=False):
         # if precompute set to True b default
@@ -242,9 +244,18 @@ class ClassifierTrainer():
         self.learn.precompute = pc
         self.learn.load(fn)
 
-    def check_test_names(self, suf='.*jpg'):
+    def check_test_names(self, suf='.jpg'):
         fnames, _, _ = csv_source(self.test_folder, self.test_csv, suffix=suf)
-        test_filenames = self.learn.data.test_ds.fnames
-        if fnames != test_filenames:
+        d_tfold = os.path.join(self.test_folder, self.test_folder)
+        fnames = [ff.replace(suf*2, suf).replace(d_tfold, self.test_folder)
+                  for ff in fnames]
+        if self.learn.precompute:
+            t_fns = self.data.test_ds.fnames
+        else:
+            t_fns = self.learn.data.test_ds.fnames
+        if fnames != t_fns:
+            print('Csv fnames:\n{}'.format(fnames[0:5]))
+            print('Data loader fnames:\n{}'.format(t_fns[0:5]))
             es = 'Testset file names do no match! Try sorting "self.learn.data.test_ds.fnames"'
             raise Exception(RuntimeError(es))
+

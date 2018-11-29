@@ -6,15 +6,38 @@ import fastai.plots as fp
 import sklearn.metrics as metrics
 import classifier as cl
 from classifier import ClassifierTrainer
+import json
+import datetime
 
+def do_train(fn, params_dict):
+    save_params(fn, params_dict)
+
+    trainer = ClassifierTrainer(**params_dict)
+    print('training.')
+    trainer.train(lr=1e-2)
+
+
+def save_params(fn, params):
+    p_strs = {}
+    for key, value in params.items():
+        if isinstance(value, str):
+            p_strs[key] = value
+        elif isinstance(value, Path):
+            p_strs[key] = str(value)
+        else:
+            p_strs[key] = value.__str__()
+
+    if not str(fn).endswith('.json'):
+        fn += '.json'
+    with open(fn, 'w') as fp:
+        json.dump(p_strs, fp, indent=2, sort_keys=True)
+    print('Params saved as {}'.format(fn))
 
 if __name__ == "__main__":
+
     ldir = Path('/home/sean/hpc-home/')
     hdir = ldir if ldir.exists() else Path('/home/n8307628')
     PATH = hdir / 'skin_cancer/'
-    arch = resnet101
-    im_size = 224
-    bs = 64
 
     arch = resnet101
     im_size = 256
@@ -29,20 +52,28 @@ if __name__ == "__main__":
     # val_idx should be the last 150 images from the train csv
     train_df = pd.read_csv(train_csv)
     trlen = len(train_df)
-    val_idx = list(range(trlen - 150, trlen))
+    val_idx = range(trlen - 150, trlen)
 
-    weight_name = 'resnet101_all_no_ia_nervi'
+    weight_name = 'resnet101_all_no_ia_nervi' + \
+        datetime.datetime.now().strftime('_%Y-%m-%d')
 
-    trainer = ClassifierTrainer(PATH, arch, im_size, bs, train_csv,
-                                 sn=weight_name, test_csv=test_csv, test_folder=test_path,
-                                 val_idx=val_idx)
-                            
-    trainer.set_lr(1e-2)
-    print('training.')
-    trainer.init_fit(weight_name + '_1')
-    trainer.test_val(tta=False, sf=False)
-    trainer.inter_fit(weight_name + '_2')
-    trainer.test_eval(tta=False, sf=False)
-    trainer.final_fit(weight_name + '_3')
-    trainer.test_val(sf=False)
-    trainer.test_eval(sf=False)
+    dt_str = datetime.datetime.now().strftime('_%Y-%m-%d__%H-%M_')
+    save_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'param_files')
+    params_file_name = os.path.join(save_dir, weight_name + dt_str +'.json')
+    if not os.path.isdir(os.path.dirname(params_file_name)):
+        os.mkdir(os.path.dirname(params_file_name))
+
+    params_dict = {'path': str(PATH), 'arch': arch, 'sz': im_size,
+                   'bs': bs, 'trn_csv': train_csv, 'sn': weight_name,
+                   'test_csv': test_csv, 'test_folder': test_path, 'val_idx': val_idx,
+                   'precom': True, 'num_workers': 4, 'lr': 1e-2, 'aug_tfms': transforms_top_down}
+    do_train(params_file_name, params_dict)
+
+
+
+# class ClassifierTrainer():
+
+#     def __init__(self, path, arch, sz, bs, trn_csv, aug_tfms=transforms_top_down,
+#                  train_folder='', test_folder=None, val_idx=None, test_csv=None,
+#                  lr=1e-2, sn=None, num_workers=8, precom=True):
+
