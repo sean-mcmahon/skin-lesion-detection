@@ -14,7 +14,7 @@ def do_train(fn, params_dict):
 
     trainer = ClassifierTrainer(**params_dict)
     print('training.')
-    trainer.train(lr=1e-2)
+    trainer.train(lr=params_dict['lr'])
 
 
 def save_params(fn, params):
@@ -34,18 +34,22 @@ def save_params(fn, params):
     print('Params saved as {}'.format(fn))
 
 if __name__ == "__main__":
-
     ldir = Path('/home/sean/hpc-home/')
     hdir = ldir if ldir.exists() else Path('/home/n8307628')
     PATH = hdir / 'skin_cancer/'
 
     arch = resnet101
-    im_size = 256
+    im_size = 200
     bs = 64
+    num_workers = 8
 
-    train_csv = PATH / 'train_multi_half_ia_nervi.csv'
-    test_csv = PATH / 'ISIC/test_all_17.csv'
-    test_path = PATH / 'ISIC/ISIC-2017_Test_v2_Data_Classification/'
+    train_csv = PATH / 'train_multi_mel.csv'
+    test_csv = PATH / 'ISIC/test_mel_17.csv'
+    test_folder = 'ISIC/ISIC-2017_Test_v2_Data_Classification/'
+    test_path = PATH / test_folder
+    weight_name = 'resnet101_mel_allds'
+
+
     assert all([train_csv.exists(), test_csv.exists(), test_path.is_dir()]),  [
         train_csv.exists(), test_csv.exists(), test_path.is_dir()]
 
@@ -54,8 +58,7 @@ if __name__ == "__main__":
     trlen = len(train_df)
     val_idx = range(trlen - 150, trlen)
 
-    weight_name = 'resnet101_all_no_ia_nervi' + \
-        datetime.datetime.now().strftime('_%Y-%m-%d')
+    weight_name += datetime.datetime.now().strftime('_%Y-%m-%d')
 
     dt_str = datetime.datetime.now().strftime('_%Y-%m-%d__%H-%M_')
     save_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'param_files')
@@ -63,10 +66,10 @@ if __name__ == "__main__":
     if not os.path.isdir(os.path.dirname(params_file_name)):
         os.mkdir(os.path.dirname(params_file_name))
 
-    params_dict = {'path': str(PATH), 'arch': arch, 'sz': im_size,
+    params_dict = {'path': PATH, 'arch': arch, 'sz': im_size,
                    'bs': bs, 'trn_csv': train_csv, 'sn': weight_name,
-                   'test_csv': test_csv, 'test_folder': test_path, 'val_idx': val_idx,
-                   'precom': True, 'num_workers': 4, 'lr': 1e-2, 'aug_tfms': transforms_top_down}
+                   'test_csv': test_csv, 'test_folder': test_folder, 'val_idx': val_idx,
+                   'precom': False, 'num_workers': num_workers, 'lr': 1e-2, 'aug_tfms': transforms_top_down}
     do_train(params_file_name, params_dict)
 
 

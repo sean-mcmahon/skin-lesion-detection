@@ -247,7 +247,7 @@ class ClassifierTrainer():
     def check_test_names(self, suf='.jpg'):
         fnames, _, _ = csv_source(self.test_folder, self.test_csv, suffix=suf)
         d_tfold = os.path.join(self.test_folder, self.test_folder)
-        fnames = [ff.replace(suf*2, suf).replace(d_tfold, self.test_folder)
+        fnames = [str(ff).replace(suf*2, suf).replace(d_tfold, self.test_folder)
                   for ff in fnames]
         if self.learn.precompute:
             t_fns = self.data.test_ds.fnames
