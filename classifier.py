@@ -147,7 +147,14 @@ class ClassifierTrainer():
         else:
             self.sn = sn
         print(f'Saving model as "{self.sn}"')
+        print('-> Train set value counts')
+        trn_df = pd.read_csv(path / trn_csv)
+        print(trn_df.iloc[:, -1].value_counts())
 
+        if test_csv:
+            print('Test set value counts')
+            tst_df = pd.read_csv(path / test_csv)
+            print(tst_df.iloc[:, -1].value_counts())
         # Dataset augmentations
         tfms = tfms_from_model(arch, sz, aug_tfms=transforms_top_down)
         # The dataloader, used for training and evaluation, has numerous useful functions for:

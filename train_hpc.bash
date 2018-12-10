@@ -48,9 +48,12 @@ else
     gpu=-1
 fi
 
-trainset='train_multi_mel.csv'
-testset='ISIC/test_mel_17.csv'
-weight_name='resnet101_mel_allds'
+trainset=${TRAINCSV:'train_multi_mel.csv'}
+testset=${TESTCSV:'ISIC/test_mel_17.csv'}
+weight_name=${WEIGHTN:'resnet101_mel_allds'}
+
+echo 'Training with ', $trainset
+echo 'Testing with  ', $testset
+echo 'Weight name   ', $weight_name
 
 python train_classifier.py --train_csv $trainset --test_csv $testset --weight_name $weight_name
-
