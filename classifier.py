@@ -1,6 +1,8 @@
 from fastai.conv_learner import *
 from fastai.plots import plot_confusion_matrix
 import sklearn.metrics as metrics
+import os
+import matplotlib.pyplot as plt
 
 
 def rand_by_mask(mask, preds, mpl=4): 
@@ -134,11 +136,12 @@ class ClassifierTrainer():
 
     def __init__(self, path, arch, sz, bs, trn_csv, aug_tfms=transforms_top_down,
                   train_folder='', test_folder=None, val_idx=None, test_csv=None,
-                 lr=1e-2, sn=None, num_workers=8, precom=True):
+                 lr=1e-2, sn=None, num_workers=8, precom=True, params_fn=None):
         self.arch = arch
         self.dlr = lr
         self.test_folder = test_folder
         self.test_csv = test_csv
+        self.params_fn = params_fn
         if sn is None:
             self.sn = 'train_' + self.arch.__name__
         else:
@@ -195,6 +198,7 @@ class ClassifierTrainer():
         self.learn.fit(self.dlr, 2, cycle_len=1, cycle_mult=2)
         self.learn.save(sn)
         print('Saved weights as "{}"'.format(sn))
+        self.plot_training(sn)
 
     def final_fit(self, name=None):
         wd = 5e-4
@@ -202,7 +206,9 @@ class ClassifierTrainer():
         self.learn.unfreeze()
         lrs = np.array([self.dlr / 100, self.dlr / 10, self.dlr])
         self.learn.fit(lrs, 3, cycle_len=1, cycle_mult=2, wds=wd)
+        self.plot_training(sn + 'a')
         self.learn.fit(lrs, 5, cycle_len=3, wds=wd)
+        self.plot_training(sn + 'b')
         self.learn.save(sn)
         print('Saved weights as "{}"'.format(sn))
         
@@ -245,6 +251,17 @@ class ClassifierTrainer():
         self.learn.load(fn)
 
     def check_test_names(self, suf='.jpg'):
+        def folder_and_name(path):
+            folder_n = os.path.basename(os.path.dirname(path))
+            fname = os.path.basename(path)
+            return os.path.join(folder_n, fname)
+        def base_fnames(paths):
+            if isinstance(paths, str):
+                return folder_and_name(paths)
+            elif isinstance(paths, list) or isinstance(paths, tuple):
+                return [folder_and_name(ss) for ss in paths]
+            else:
+                return paths
         fnames, _, _ = csv_source(self.test_folder, self.test_csv, suffix=suf)
         d_tfold = os.path.join(self.test_folder, self.test_folder)
         fnames = [str(ff).replace(suf*2, suf).replace(d_tfold, self.test_folder)
@@ -253,9 +270,43 @@ class ClassifierTrainer():
             t_fns = self.data.test_ds.fnames
         else:
             t_fns = self.learn.data.test_ds.fnames
+        # fnames = base_fnames(fnames)
+        # t_fns = base_fnames(t_fns)
         if fnames != t_fns:
             print('Csv fnames:\n{}'.format(fnames[0:5]))
             print('Data loader fnames:\n{}'.format(t_fns[0:5]))
             es = 'Testset file names do no match! Try sorting "self.learn.data.test_ds.fnames"'
             raise Exception(RuntimeError(es))
 
+    def plot_training(self, save_name):
+        def plot_loss(train_losses, val_losses, rec_metrics, num_ep, epoch_iters):
+            fig, ax = plt.subplots(2, 1, figsize=(8, 12))
+            ax[0].grid()
+            ax[0].plot(list(range(num_ep)), val_losses, label='Validation loss')
+            ax[0].plot(list(range(num_ep)), [train_losses[i-1]
+                                            for i in epoch_iters], 
+                                            label='Training loss')
+            ax[0].set_xlabel('Epoch')
+            ax[0].set_ylabel('Loss')
+            ax[0].legend(loc='upper right')
+            ax[1].plot(list(range(num_ep)), rec_metrics)
+            ax[1].set_xlabel('Epoch')
+            ax[1].set_ylabel('Accuracy')
+            ax[1].set_ylim(bottom=min(0.5, min(rec_metrics)))
+            ax[1].grid()
+            return fig, ax
+
+        trnl = self.learn.sched.losses
+        vall = self.learn.sched.val_losses
+        metrics = self.learn.sched.rec_metrics
+        num_ep = self.learn.sched.epoch
+        ep_iterations = self.learn.sched.epochs
+        fig, ax = plot_loss(trnl, vall, metrics, num_ep, ep_iterations)
+
+        fig_fold = os.path.splitext(self.params_fn)[0]
+        if not os.path.isdir(fig_fold):
+            os.mkdir(fig_fold)
+        fig_fn = os.path.join(fig_fold, os.path.basename(save_name))
+        fig_fn = os.path.splitext(fig_fn)[0] + '.png'
+        print('Saving plots as "{}"'.format(fig_fn))
+        fig.savefig(fig_fn, dpi=fig.dpi)

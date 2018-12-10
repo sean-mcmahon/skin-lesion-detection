@@ -8,8 +8,11 @@
 
 module load anaconda3/5.1.0
 
-cd ~/fastai/courses/projects
-source activate fastai
+# cd ~/fastai/courses/projects
+# source activate fastai
+
+cd /home/sean/src/fastai/courses/projects
+conda activate fastai
 
 USEGPU='true'
 if [[ $(lsb_release -si) == *"SUSE"* ]]; then
@@ -45,6 +48,9 @@ else
     gpu=-1
 fi
 
+trainset='train_multi_mel.csv'
+testset='ISIC/test_mel_17.csv'
+weight_name='resnet101_mel_allds'
 
-python train_classifier.py
+python train_classifier.py --train_csv $trainset --test_csv $testset --weight_name $weight_name
 
