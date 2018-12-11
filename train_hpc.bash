@@ -8,11 +8,11 @@
 
 module load anaconda3/5.1.0
 
-# cd ~/fastai/courses/projects
-# source activate fastai
+cd ~/fastai/courses/projects
+source activate fastai
 
-cd /home/sean/src/fastai/courses/projects
-conda activate fastai
+# cd /home/sean/src/fastai/courses/projects
+# conda activate fastai
 
 USEGPU='true'
 if [[ $(lsb_release -si) == *"SUSE"* ]]; then
@@ -48,12 +48,13 @@ else
     gpu=-1
 fi
 
-trainset=${TRAINCSV:'train_multi_mel.csv'}
-testset=${TESTCSV:'ISIC/test_mel_17.csv'}
-weight_name=${WEIGHTN:'resnet101_mel_allds'}
+trainset=${TRAINCSV:-'train_multi_mel.csv'}
+testset=${TESTCSV:-'ISIC/test_mel_17.csv'}
+weight_name=${WEIGHTN:-'resnet101_mel_allds'}
+test_folder=${TESTFOLDER:-'ISIC/ISIC-2017_Test_v2_Data_Classification/'}
 
 echo 'Training with ', $trainset
 echo 'Testing with  ', $testset
 echo 'Weight name   ', $weight_name
 
-python train_classifier.py --train_csv $trainset --test_csv $testset --weight_name $weight_name
+python train_classifier.py --train_csv $trainset --test_csv $testset --weight_name $weight_name --test_folder $test_folder

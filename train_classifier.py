@@ -63,7 +63,7 @@ def main():
 
     train_csv = PATH / args.train_csv
     test_csv = PATH / args.test_csv
-    test_folder = 'ISIC/ISIC-2017_Test_v2_Data_Classification/'
+    test_folder = args.test_folder
     test_path = PATH / test_folder
     weight_name = args.weight_name
 
@@ -95,6 +95,8 @@ if __name__ == "__main__":
     parser.add_argument('--train_csv', type=str)
     parser.add_argument('--test_csv', type=str)
     parser.add_argument('--weight_name', type=str)
+    parser.add_argument('--test_folder', type=str,
+                        default='ISIC/ISIC-2017_Test_v2_Data_Classification/')
     parser.add_argument('--num_workers', type=int, default=8)
     parser.add_argument('--im_size', type=int, default=200)
     parser.add_argument('--batchsize', type=int, default=64)
