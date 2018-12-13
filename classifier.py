@@ -162,7 +162,7 @@ class ClassifierTrainer():
         self.data = ImageClassifierData.from_csv(path, train_folder, trn_csv, tfms=tfms,
                                                  suffix='', bs=bs, test_name=self.test_folder,
                                                  val_idxs=val_idx, num_workers=num_workers)
-        self.data.test_ds.fnames = sorted(self.data.test_ds.fnames)
+        if self.test_folder: self.data.test_ds.fnames = sorted(self.data.test_ds.fnames)
         print('Dataset has: {} classes'.format(self.data.classes))
         self.learn = ConvLearner.pretrained(
             self.arch, self.data, precompute=precom)
@@ -225,10 +225,10 @@ class ClassifierTrainer():
 
     def test_eval(self, t_csv=None, tta=False, sf=False):
         if t_csv: self.test_csv = t_csv
-        self.check_test_names()
         if self.test_csv is None:
             print('no test labels given')
             return
+        self.check_test_names()
         *res, = run_test(
             self.learn, ts=True, sf=sf, test_csv=self.test_csv,
             test_folder=self.test_folder, tta=tta)
@@ -256,6 +256,7 @@ class ClassifierTrainer():
         # but when loading models without precomute, it needs to be false.
         self.learn.precompute = pc
         self.learn.load(fn)
+        # load_model(self.learn.model, self.get_model_path(name))
 
     def check_test_names(self, suf='.jpg'):
         def folder_and_name(path):

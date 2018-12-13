@@ -37,7 +37,7 @@ def denorm_img(im, denorm_func):
     imd = (imd.squeeze() * 255).astype(np.uint8)
     # For encoding back to jpg byte array, BGR is expected. 
     # So reverse the channel dimension
-    # imd = imd[:, :, ::-1]
+    imd = imd[:, :, ::-1]
     return imd
 
 
