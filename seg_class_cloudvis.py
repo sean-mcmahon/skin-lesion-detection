@@ -18,18 +18,17 @@ if not os.path.isfile(weights): raise FileNotFoundError(f'Invalid: {weights}')
 load_model(net, weights) # loads weights to "net" - fastai function
 
 # Load Classifier
-PATH = Path('/home/sean/hpc-home/skin_cancer')
+PATH = Path('/home/sean/src/docker_cloudvis')
+# if not PATH.exists(): PATH = Path('/app/')
 arch = resnet101
 im_size = 100
 bs = 1
 num_workers = 1
-test_folder = 'ISIC/ISIC-2017_Test_v2_Data_Classification/'
+test_folder = None #'ISIC/ISIC-2017_Test_v2_Data_Classification/'
 train_csv = PATH / 'train_multi_Mel_half.csv'
-test_csv = PATH / 'ISIC/test_mel_17.csv'
-test_path = PATH / test_folder
+test_csv = None
+# test_path = PATH / test_folder
 
-assert all([train_csv.exists(), test_csv.exists(), test_path.is_dir()]),  [
-    train_csv.exists(), test_csv.exists(), test_path.is_dir()]
 
 # val_idx should be the last 150 images from the train csv
 val_idx = None
