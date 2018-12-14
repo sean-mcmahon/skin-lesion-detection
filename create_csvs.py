@@ -1,4 +1,5 @@
 from classifier import *
+import os
 
 PATH = Path('/home/sean/hpc-home/skin_cancer/')
 
@@ -151,3 +152,110 @@ def create_multi_train_test(class_col, train_fn, test_fn, half_ia_n=False):
     test.loc[:, class_col].to_csv(test_fn)
     return train, test
 
+def create_half_nevus_datasets(path_):
+    classes = ('melanoma', 'keratosis', 'classes')
+    if not os.path.isdir(str(path_)): os.mkdir(str(path_))
+    trn_n = path_ / 'train_{}_multi_halfn.csv'
+    tst_n = path_ / 'test_{}_multi_halfn.csv'
+    for cls_col in classes:
+        create_multi_train_test(cls_col, trn_n.format(
+            cls_col), tst_n.format(cls_col), half_ia_n=True)
+
+
+# ------------------------------------------------------------------
+# Lession Segmentation Dataset Functions
+# ------------------------------------------------------------------
+
+def check_paths(path_, iterable): 
+    return all([os.path.exists(path_ / i) for i in list(iterable)])
+
+def seg_lesion(im, mask):
+    im = im if isinstance(im, np.ndarray) else open_image(im)
+    mask = mask if isinstance(mask, np.ndarray) else open_image(mask)
+    mask = mask[:, :, 0] if mask.ndim > 2 else mask
+    blob_coords = np.where(mask == 1)
+    blob_ys = blob_coords[0]
+    blob_xs = blob_coords[1]
+
+    ly = min(blob_ys)
+    uy = max(blob_ys)
+    lx = min(blob_xs)
+    ux = max(blob_xs)
+
+    t_left = [lx, ly]
+    h = uy - ly
+    w = ux - lx
+
+    return im[t_left[1]:t_left[1]+h, t_left[0]:t_left[0]+w]
+
+def create_seg_images(img_names, mask_names):
+    if len(img_names) != len(mask_names):
+        raise ValueError('Number of images does not match number of masks')
+
+    for count, (im, mask) in enumerate(zip(img_names, mask_names)):
+        im = str(im)
+        par_dir = str(os.path.dirname(im)) # dirname strips final '/'
+        n_par_dir = par_dir + '_lesion_seg'
+        nname = im.replace(par_dir, n_par_dir)
+        if not os.path.isdir(os.path.dirname(nname)):
+            os.mkdir(os.path.dirname(nname))
+        if os.path.exists(nname):
+            continue
+        # if filename does not exist do this
+        if count % 100 == 0:
+            print('Saved {}/{} images'.format(count, len(img_names)))
+        seg_im = seg_lesion(im, mask)
+        scipy.misc.imsave(nname, seg_im)
+
+
+def g_fns(fpath, ext='.png'):
+    return np.array(sorted([f for f in fpath.glob('*'+ext)]))
+
+def get_isic_ims_n_mask(image_folder, mask_folder):
+    xtrn_i = PATH / image_folder
+    ytrn_i = PATH / mask_folder
+
+    ims = g_fns(xtrn_i, '.jpg')
+    mks = g_fns(ytrn_i, '.png')
+    return ims, mks
+
+def get_train_isic17_ims_and_mask():
+    return get_isic_ims_n_mask('ISIC/ISIC-2017_Training_Data', 
+                               'ISIC/ISIC-2017_Training_Part1_GroundTruth')
+
+def get_val_isic17_ims_and_mask():
+    return get_isic_ims_n_mask('ISIC/ISIC-2017_Validation_Data',
+                               'ISIC/ISIC-2017_Validation_Part1_GroundTruth')
+
+def get_test_isic17_ims_and_mask():
+    return get_isic_ims_n_mask('ISIC/ISIC-2017_Test_v2_Data',
+                               'ISIC/ISIC-2017_Test_v2_Part1_GroundTruth')
+
+def get_files_in_dir(p, fl, ext):
+        ims_l = []
+        for root, dirs, files in os.walk(p):
+            for fn in files:
+                if fn.endswith(ext) and fl in fn:
+                    # The right filetype and the image we want!
+                    ims_l.append(os.path.join(root, fn))
+        if len(ims_l) == 0:
+            print('No images found')
+        return ims_l
+
+def get_dermo_ims_and_mask():
+    xtrn_d = PATH / 'dermofit/'
+    d_files = get_files_in_dir(xtrn_d, '', '.png')
+    ims = np.array(sorted([x for x in d_files if not 'mask' in x]))
+    msks = np.array(sorted([x for x in d_files if 'mask' in x]))
+    return ims, msks
+
+def get_ph2_ims_and_mask():
+    d_path = PATH / 'ph2dataset/PH2_Dataset_images/'
+    d_files = get_files_in_dir(d_path, '', '.bmp')
+
+    ims = np.array(sorted([x for x in d_files if 'Dermoscopic_Image' in x]))
+    msks = np.array(sorted([x for x in d_files if '_lesion' in x]))
+    return ims, msks
+
+def segment_images():
+    pass
