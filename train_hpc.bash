@@ -58,4 +58,4 @@ echo 'Training with ', $trainset
 echo 'Testing with  ', $testset
 echo 'Weight name   ', $weight_name
 
-python train_classifier.py --train_csv $trainset --test_csv $testset --load_weights $weight_name --test_folder $test_folder --weights $pre_train
+python train_classifier.py --train_csv $trainset --test_csv $testset --weight_name $weight_name --test_folder $test_folder --load_weights $pre_train

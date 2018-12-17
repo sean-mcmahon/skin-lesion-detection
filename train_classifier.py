@@ -61,7 +61,7 @@ def main():
     bs = args.batchsize
     num_workers = args.num_workers
 
-    pre_train_w = None if args.load_weights == '' else args.load_weights
+    pre_train_w = None if args.load_weights == '' or args.load_weights == 'None' else args.load_weights
 
     train_csv = PATH / args.train_csv
     test_csv = PATH / args.test_csv
