@@ -167,7 +167,13 @@ def create_half_nevus_datasets(path_):
 # ------------------------------------------------------------------
 
 def check_paths(path_, iterable): 
-    return all([os.path.exists(path_ / i) for i in list(iterable)])
+    f_checks = [os.path.exists(path_ / i) for i in list(iterable)]
+    check = all(f_checks)
+    # if not check:
+    #     inval = [i for c, i in enumerate(list(iterable)) if not f_checks[c]]
+    #     print(inval)
+    return check
+
 
 def seg_lesion(im, mask):
     im = im if isinstance(im, np.ndarray) else open_image(im)
@@ -195,6 +201,7 @@ def create_seg_images(img_names, mask_names):
     for count, (im, mask) in enumerate(zip(img_names, mask_names)):
         im = str(im)
         par_dir = str(os.path.dirname(im)) # dirname strips final '/'
+        if '_lesion_seg' in par_dir: raise ValueError('Invalid filename {}'.format(par_dir))
         n_par_dir = par_dir + '_lesion_seg'
         nname = im.replace(par_dir, n_par_dir)
         if not os.path.isdir(os.path.dirname(nname)):
@@ -232,15 +239,15 @@ def get_test_isic17_ims_and_mask():
                                'ISIC/ISIC-2017_Test_v2_Part1_GroundTruth')
 
 def get_files_in_dir(p, fl, ext):
-        ims_l = []
-        for root, dirs, files in os.walk(p):
-            for fn in files:
-                if fn.endswith(ext) and fl in fn:
-                    # The right filetype and the image we want!
-                    ims_l.append(os.path.join(root, fn))
-        if len(ims_l) == 0:
-            print('No images found')
-        return ims_l
+    ims_l = []
+    for root, dirs, files in os.walk(p):
+        for fn in files:
+            if fn.endswith(ext) and fl in fn:
+                # The right filetype and the image we want!
+                ims_l.append(os.path.join(root, fn))
+    if len(ims_l) == 0:
+        print('No images found')
+    return ims_l
 
 def get_dermo_ims_and_mask():
     xtrn_d = PATH / 'dermofit/'
@@ -258,4 +265,65 @@ def get_ph2_ims_and_mask():
     return ims, msks
 
 def segment_images():
-    pass
+    def get_and_append(ims, masks, cb):
+        ims_, masks_ = cb()
+        # remove segmented filenames from list. The create_seg_images will skip already segmented images.
+        ims_ = np.array([i for i in ims_ if '_lesion_seg/' not in str(i)])
+        es = 'Different Lengths; ims {} and masks {}\nims: {}\nmasks: {}'
+        assert len(ims_) == len(masks_), es.format(
+            len(ims_), len(masks_), ims_[0:5], masks_[0:5])
+        return np.concatenate([ims, ims_]), np.concatenate([masks, masks_])
+    print('Getting image and mask filenames')
+    ims, masks = np.array(()), np.array(())
+    ims, masks = get_and_append(ims, masks, get_train_isic17_ims_and_mask)
+    ims, masks = get_and_append(ims, masks, get_dermo_ims_and_mask)
+    ims, masks = get_and_append(ims, masks, get_ph2_ims_and_mask)
+    ims, masks = get_and_append(ims, masks, get_val_isic17_ims_and_mask)
+    
+    test_ims, test_masks = np.array(()), np.array(())
+    test_ims, test_masks = get_and_append(test_ims, test_masks, get_test_isic17_ims_and_mask)
+
+    print('Segmenting images.')
+    create_seg_images(ims, masks)
+    create_seg_images(test_ims, test_masks)
+    print('Finished segmenting.')
+
+
+def create_seg_csvs():
+    def seg_paths(df):
+        ids = list(df.index)
+        ni = []
+        for i in ids:
+            par_dir = os.path.basename(os.path.dirname(i)).strip()
+            n = par_dir + '_lesion_seg'
+            ni.append(i.replace(par_dir+'/', n+'/'))
+        return ni
+    isic_train = load_isic17_train()
+    dermo = load_dermofit()
+    ph2 = load_ph2()
+    isic_val = load_isic17_val()
+    print('\n------\n')
+    multi_train = pd.concat([isic_train, dermo, ph2, isic_val])
+    print('Multi Dataset Trainset... {} elements'.format(len(multi_train)))
+    #print(multi_train.head())
+
+    multi_train.index = seg_paths(multi_train)
+    vis_classes(multi_train, sf=False)
+
+    test_df = load_isic17_test()
+    test_df.index = seg_paths(test_df)
+    vis_classes(test_df, sf=False)
+    
+    return multi_train, test_df
+    
+
+def create_seg_datasets(path_):
+    train, test = create_seg_csvs()
+    classes = ('melanoma', 'keratosis', 'classes')
+    if not os.path.isdir(str(path_)):
+        os.mkdir(str(path_))
+    trn_n = str(path_ / 'train_seg_{}_multi.csv')
+    tst_n = str(path_ / 'ISIC/test_seg_{}_multi.csv')
+    for cls_col in classes:
+        train.loc[:, cls_col].to_csv(trn_n.format(cls_col))
+        test.loc[:, cls_col].to_csv(tst_n.format(cls_col))
