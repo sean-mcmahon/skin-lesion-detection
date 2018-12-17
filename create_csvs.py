@@ -325,5 +325,5 @@ def create_seg_datasets(path_):
     trn_n = str(path_ / 'train_seg_{}_multi.csv')
     tst_n = str(path_ / 'ISIC/test_seg_{}_multi.csv')
     for cls_col in classes:
-        train.loc[:, cls_col].to_csv(trn_n.format(cls_col))
-        test.loc[:, cls_col].to_csv(tst_n.format(cls_col))
+        train.to_csv(trn_n.format(cls_col), columns=[cls_col])
+        test.to_csv(tst_n.format(cls_col), columns=[cls_col])

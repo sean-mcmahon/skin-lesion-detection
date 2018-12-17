@@ -136,7 +136,7 @@ class ClassifierTrainer():
 
     def __init__(self, path, arch, sz, bs, trn_csv, aug_tfms=transforms_top_down,
                   train_folder='', test_folder=None, val_idx=None, test_csv=None,
-                 lr=1e-2, sn=None, num_workers=8, precom=True, params_fn=None):
+                 lr=1e-2, sn=None, num_workers=8, precom=False, params_fn=None):
         self.arch = arch
         self.dlr = lr
         self.test_folder = test_folder
@@ -162,7 +162,8 @@ class ClassifierTrainer():
         self.data = ImageClassifierData.from_csv(path, train_folder, trn_csv, tfms=tfms,
                                                  suffix='', bs=bs, test_name=self.test_folder,
                                                  val_idxs=val_idx, num_workers=num_workers)
-        if self.test_folder: self.data.test_ds.fnames = sorted(self.data.test_ds.fnames)
+        # if self.test_folder: 
+        self.data.test_ds.fnames = sorted(self.data.test_ds.fnames)
         print('Dataset has: {} classes'.format(self.data.classes))
         self.learn = ConvLearner.pretrained(
             self.arch, self.data, precompute=precom)
