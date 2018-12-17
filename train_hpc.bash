@@ -4,7 +4,7 @@
 #PBS -l ncpus=8
 #PBS -l mem=32GB
 #PBS -l gputype=M40
-#PBS -l walltime=6:00:00
+#PBS -l walltime=4:00:00
 
 module load anaconda3/5.1.0
 
@@ -52,9 +52,10 @@ trainset=${TRAINCSV:-'train_multi_mel.csv'}
 testset=${TESTCSV:-'ISIC/test_mel_17.csv'}
 weight_name=${WEIGHTN:-'resnet101_mel_allds'}
 test_folder=${TESTFOLDER:-'ISIC/ISIC-2017_Test_v2_Data_Classification/'}
+pre_train=${PREWEIGHTS:-''}
 
 echo 'Training with ', $trainset
 echo 'Testing with  ', $testset
 echo 'Weight name   ', $weight_name
 
-python train_classifier.py --train_csv $trainset --test_csv $testset --weight_name $weight_name --test_folder $test_folder
+python train_classifier.py --train_csv $trainset --test_csv $testset --load_weights $weight_name --test_folder $test_folder --weights $pre_train

@@ -61,12 +61,16 @@ def main():
     bs = args.batchsize
     num_workers = args.num_workers
 
+    pre_train_w = None if args.load_weights == '' else args.load_weights
+
     train_csv = PATH / args.train_csv
     test_csv = PATH / args.test_csv
     test_folder = args.test_folder
     test_path = PATH / test_folder
     weight_name = args.weight_name
 
+    augs = transforms_top_down + \
+        [RandomZoom(zoom_max=1.1, zoom_min=-0.5), RandomBlur()]
 
     assert all([train_csv.exists(), test_csv.exists(), test_path.is_dir()]),  [
         train_csv.exists(), test_csv.exists(), test_path.is_dir()]
@@ -80,7 +84,8 @@ def main():
                    'bs': bs, 'trn_csv': train_csv, 'sn': weight_name,
                    'test_csv': test_csv, 'test_folder': test_folder, 'val_idx': val_idx,
                    'precom': False, 'num_workers': num_workers, 'lr': 1e-2, 
-                   'aug_tfms': transforms_top_down, 'params_fn': params_file_name}
+                   'aug_tfms': augs, 'params_fn': params_file_name,
+                   'weights': pre_train_w}
     
     # Train model with params
     save_params(params_file_name, params_dict)
@@ -98,8 +103,9 @@ if __name__ == "__main__":
     parser.add_argument('--test_folder', type=str,
                         default='ISIC/ISIC-2017_Test_v2_Data_Classification/')
     parser.add_argument('--num_workers', type=int, default=8)
-    parser.add_argument('--im_size', type=int, default=200)
+    parser.add_argument('--im_size', type=int, default=300)
     parser.add_argument('--batchsize', type=int, default=64)
+    parser.add_argument('--load_weights', type=str, default='')
 
     args = parser.parse_args()
     main()

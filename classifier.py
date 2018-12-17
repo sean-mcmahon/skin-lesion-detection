@@ -136,7 +136,7 @@ class ClassifierTrainer():
 
     def __init__(self, path, arch, sz, bs, trn_csv, aug_tfms=transforms_top_down,
                   train_folder='', test_folder=None, val_idx=None, test_csv=None,
-                 lr=1e-2, sn=None, num_workers=8, precom=False, params_fn=None):
+                 lr=1e-2, sn=None, num_workers=8, precom=False, params_fn=None, weights=None):
         self.arch = arch
         self.dlr = lr
         self.test_folder = test_folder
@@ -167,6 +167,16 @@ class ClassifierTrainer():
         print('Dataset has: {} classes'.format(self.data.classes))
         self.learn = ConvLearner.pretrained(
             self.arch, self.data, precompute=precom)
+
+        if weights:
+            print('Loading weights "{}"'.format(weights))
+            self.load(weights)
+
+        print('Cuda: {}; Cudnn {}'.format(
+            torch.cuda.is_available(), torch.backends.cudnn.enabled))
+        if not torch.cuda.is_available():
+            raise Exception('Cuda not available ' + 'Cuda: {}; Cudnn {}'.format(
+                torch.cuda.is_available(), torch.backends.cudnn.enabled))
 
     @classmethod
     def from_data_loader(self, data_cls, arch, test_csv=None, prec=True, lr=1e-2, sn=None):
