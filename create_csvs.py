@@ -148,18 +148,23 @@ def create_multi_train_test(class_col, train_fn, test_fn, half_ia_n=False):
     train = combine_training(half_ia_n=half_ia_n)
     print(' ---- ')
     test = load_isic17_test()
-    train.loc[:, class_col].to_csv(train_fn)
+    train.loc[:, class_col].to_csv(train_fn, co)
     test.loc[:, class_col].to_csv(test_fn)
     return train, test
 
 def create_half_nevus_datasets(path_):
     classes = ('melanoma', 'keratosis', 'classes')
     if not os.path.isdir(str(path_)): os.mkdir(str(path_))
-    trn_n = path_ / 'train_{}_multi_halfn.csv'
-    tst_n = path_ / 'test_{}_multi_halfn.csv'
+    trn_n = str(path_ / 'train_{}_multi_halfn.csv')
+    tst_n = str(path_ / 'ISIC/test_{}_multi_halfn.csv')
+
+    train = combine_training(half_ia_n=True)
+    print(' ---- ')
+    test = load_isic17_test()
+    
     for cls_col in classes:
-        create_multi_train_test(cls_col, trn_n.format(
-            cls_col), tst_n.format(cls_col), half_ia_n=True)
+        train.to_csv(trn_n.format(cls_col), columns=[cls_col])
+        test.to_csv(tst_n.format(cls_col), columns=[cls_col])
 
 
 # ------------------------------------------------------------------
