@@ -7,9 +7,9 @@ import argparse
 
 
 def check_csv_names(csvlist, path):
-    nl = [os.path.join(path, n ) + '.csv' for n in csvlist]
+    nl = [os.path.join(path, n ) for n in csvlist]
     fncheck = [os.path.isfile(n) for n in nl]
-    print fncheck
+    if not all(fncheck): print fncheck
     invalfns = [nl[idx]
                 for idx in [i for i, x in enumerate(fncheck) if x == False]]
     assert all(fncheck), 'Invalid csvs {}'.format(invalfns)
@@ -23,27 +23,35 @@ if __name__ == '__main__':
     gpidx = 1
 
     # training sets and weight names
-    jnames = ['cls_seg', 'Mel_seg', 'SK_seg']
-    trncsvs = ['train_seg_classes_multi',
-               'train_seg_melanoma_multi', 'train_seg_keratosis_multi']
+    jnames = ['cls_multi', 'Mel_multi', 'SK_multi']
+    trncsvs = ['train_classes_multi_halfn',
+               'train_melanoma_multi_halfn', 'train_keratosis_multi_halfn']
 
-    tstcsvs = ['test_seg_classes_multi',
-               'test_seg_melanoma_multi', 'test_seg_keratosis_multi']
-    test_folders = ['ISIC/2017_Test_v2_Data_Classification_lesion_seg/']*3
-    wnames = ['res_101_class_seg_pret', 'res_101_mel_seg_pret',
-              'res_101_sk_seg_pret']
+    tstcsvs = ['test_classes_multi_halfn',
+               'test_melanoma_multi_halfn', 'test_keratosis_multi_halfn']
+    test_folders = ['ISIC/ISIC-2017_Test_v2_Data_Classification/']*3
+    wnames = ['res_101_class_multi_seg_pret', 'res_101_mel_multi_seg_pret',
+              'res_101_sk_multi_seg_pret']
 
+    weights = ['res_101_class_seg_pret_2018-12-17_3',
+               'res_101_mel_seg_pret_2018-12-17_3', 'res_101_sk_seg_pret_2018-12-17_3']
 
     trncsvs = [ss+'.csv' for ss in trncsvs]
     tstcsvs = ['ISIC/'+ ss + '.csv' for ss in tstcsvs]
 
     check_csv_names(trncsvs, path)
     check_csv_names(tstcsvs, path)
+    val_test_p = [os.path.isdir(os.path.join(path, tf)) for tf in test_folders]
+    assert all(val_test_p), 'Invalid test folders\n{}'.format([test_folders[c] for c,i in enumerate(val_test_p) if not i])
+    
+    check_wnames = [os.path.isfile(os.path.join(path, 'models', tf) + '.h5') for tf in weights]
+    assert all(check_wnames), 'Invalid test folders\n{}'.format(
+        [weights[c] for c, i in enumerate(check_wnames) if not i])
 
-    for name, traincsv, testscv, wname, tstfolder in zip(jnames, trncsvs, tstcsvs, wnames, test_folders):
+    for name, traincsv, testscv, wname, tstfolder, p_weights in zip(jnames, trncsvs, tstcsvs, wnames, test_folders, weights):
         jobname = '%s' % name
-        cmd = "qsub -v TRAINCSV='{}',TESTCSV='{}',WEIGHTN='{}',TESTFOLDER='{}' -l gputype={} -N {} {}".format(
-            traincsv, testscv, wname, tstfolder, gputypes[gpidx], jobname, bash_script)
+        cmd = "qsub -v TRAINCSV='{}',TESTCSV='{}',WEIGHTN='{}',TESTFOLDER='{}',PREWEIGHTS='{}' -l gputype={} -N {} {}".format(
+            traincsv, testscv, wname, tstfolder, p_weights, gputypes[gpidx], jobname, bash_script)
         print '-'*20
         print 'running cmd:\n"{}"'.format(cmd)
         subprocess.check_call(cmd, shell=True)
