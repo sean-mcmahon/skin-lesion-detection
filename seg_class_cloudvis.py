@@ -7,50 +7,59 @@ PORT = 6001
 from PIL import Image
 import matplotlib.pyplot as plt
 
-base_arch = resnet34
-sz = 256
-_, vtfm = tfms_from_model(base_arch, sz, crop_type=CropType.NO, tfm_y=TfmType.NO)
-denorm = vtfm.denorm
-net = build_unet(base_arch)
-weights = '/home/sean/src/docker_fastai/128unet_dermofit_isic17_1.h5'
-if not os.path.isfile(weights): weights = '/app/128unet_dermofit_isic17_1.h5'
-if not os.path.isfile(weights): raise FileNotFoundError(f'Invalid: {weights}')
-load_model(net, weights) # loads weights to "net" - fastai function
+def load_segmentation():
+    base_arch = resnet34
+    sz = 256
+    _, vtfm = tfms_from_model(base_arch, sz, crop_type=CropType.NO, tfm_y=TfmType.NO)
+    # denorm = vtfm.denorm
+    net = build_unet(base_arch)
+    weights = '/home/sean/src/docker_fastai/128unet_dermofit_isic17_1.h5'
+    if not os.path.isfile(weights): weights = '/app/128unet_dermofit_isic17_1.h5'
+    if not os.path.isfile(weights): raise FileNotFoundError(f'Invalid: {weights}')
+    load_model(net, weights) # loads weights to "net" - fastai function
+    return net, vtfm
 
-# Load Classifier
-PATH = Path('/home/sean/src/docker_cloudvis')
-if not PATH.exists(): PATH = Path('/app/')
-arch = resnet101
-im_size = 128
-bs = 1
-num_workers = 1
-test_folder = None #'ISIC/ISIC-2017_Test_v2_Data_Classification/'
-train_csv = PATH / 'train_multi_Mel_half.csv'
-test_csv = None
-# test_path = PATH / test_folder
+def load_classifier():
+    '''
+    There's more bloat around classification in fastai. 
+    Didn't have time to figure out how to condense it all.
+    '''
+    # Load Classifier
+    PATH = Path('/home/sean/src/docker_cloudvis')
+    if not PATH.exists(): PATH = Path('/app/')
+    arch = resnet101
+    im_size = 128
+    bs = 1
+    num_workers = 1
+    test_folder = None #'ISIC/ISIC-2017_Test_v2_Data_Classification/'
+    train_csv = PATH / 'train_multi_Mel_half.csv'
+    test_csv = None
+    # test_path = PATH / test_folder
+    # val_idx should be the last 150 images from the train csv
+    val_idx = None
+
+    params_file_name = 'blah'
+
+    weight_name = "res101_Mel_mutli_half_2018-12-11"
+
+    p_dict = {'path': PATH, 'arch': arch, 'sz': im_size,
+            'bs': bs, 'trn_csv': train_csv, 'sn': weight_name,
+            'test_csv': test_csv, 'test_folder': test_folder, 'val_idx': val_idx,
+            'precom': False, 'num_workers': num_workers, 'lr': 1e-2, 'aug_tfms': transforms_top_down,
+            'params_fn': params_file_name, 'precom': False}
+
+    _, v_class_tfms = tfms_from_model(arch, im_size, aug_tfms=p_dict['aug_tfms'])
+    # class_denorm = v_class_tfms.denorm
+
+    mel_trainer = create_trainer(p_dict)
+    mel_trainer.load('res_101_mel_multi_seg_pret_2018-12-18_2')
+    sk_trainer = create_trainer(p_dict)
+    sk_trainer.load('res_101_sk_multi_seg_pret_2018-12-17_2')
+    return sk_trainer.learn.model, mel_trainer.learn.model, v_class_tfms
 
 
-# val_idx should be the last 150 images from the train csv
-val_idx = None
-
-params_file_name = 'blah'
-
-weight_name = "res101_Mel_mutli_half_2018-12-11"
-
-p_dict = {'path': PATH, 'arch': arch, 'sz': im_size,
-          'bs': bs, 'trn_csv': train_csv, 'sn': weight_name,
-          'test_csv': test_csv, 'test_folder': test_folder, 'val_idx': val_idx,
-          'precom': False, 'num_workers': num_workers, 'lr': 1e-2, 'aug_tfms': transforms_top_down,
-          'params_fn': params_file_name, 'precom': False}
-
-
-_, v_class_tfms = tfms_from_model(arch, im_size, aug_tfms=p_dict['aug_tfms'])
-class_denorm = v_class_tfms.denorm
-
-mel_trainer = create_trainer(p_dict)
-mel_trainer.load('res101_Mel_mutli_half_2018-12-11_3')
-sk_trainer = create_trainer(p_dict)
-sk_trainer.load('res101_SK_mutli_half_2018-12-11_3')
+net, vtfm = load_segmentation()
+sk_model, mel_model, v_class_tfms = load_classifier()
 
 
 def callback(request, response, data):
@@ -61,10 +70,12 @@ def callback(request, response, data):
     pred, proc_im = run_model(net, img, prepIm=vtfm)
     # im_d = (denorm(np.rollaxis(proc_im, 1, 4)).squeeze()
     #         * 255).astype(np.uint8)[:, :, ::-1]
+    im_d = denorm_img(proc_im, vtfm.denorm)
+    pred_thr = (pred > 0).astype(np.uint8)*255
 
     # Classification
-    sk_p, _ = run_model(sk_trainer.learn.model, img, prepIm=v_class_tfms)
-    mel_p, _ = run_model(mel_trainer.learn.model, img, prepIm=v_class_tfms)
+    sk_p, _ = run_model(sk_model, img, prepIm=v_class_tfms)
+    mel_p, _ = run_model(mel_model, img, prepIm=v_class_tfms)
     sk_fp, mel_fp = np.argmax(sk_p), np.argmax(mel_p)
 
     cls_pred = 'Nevus'
@@ -76,9 +87,6 @@ def callback(request, response, data):
     if mel_fp == 1:
         cls_pred = 'Melanoma'
         cls_conf = str(round(np.exp(mel_p[1]), 3))
-
-    im_d = denorm_img(proc_im, denorm)
-    pred_thr = (pred > 0).astype(np.uint8)*255
 
     response.addValues({'classification': cls_pred, 'confidence': cls_conf})
     response.addImage('input_image', im_d)
