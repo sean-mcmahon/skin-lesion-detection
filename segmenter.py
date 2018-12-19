@@ -163,6 +163,7 @@ def plot_data(x, y, title='Ground Truth', splots=(5,6), fsize=(12,10)):
 
 
 def g_fns(fpath, ext='.png'):
+    if isinstance(fpath, str): fpath = Path(fpath)
     return np.array(sorted([f for f in fpath.glob('*'+ext)]))
 
 

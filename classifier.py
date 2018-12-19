@@ -162,8 +162,7 @@ class ClassifierTrainer():
         self.data = ImageClassifierData.from_csv(path, train_folder, trn_csv, tfms=tfms,
                                                  suffix='', bs=bs, test_name=self.test_folder,
                                                  val_idxs=val_idx, num_workers=num_workers)
-        # if self.test_folder: 
-        self.data.test_ds.fnames = sorted(self.data.test_ds.fnames)
+        if self.test_folder: self.data.test_ds.fnames = sorted(self.data.test_ds.fnames)
         print('Dataset has: {} classes'.format(self.data.classes))
         self.learn = ConvLearner.pretrained(
             self.arch, self.data, precompute=precom)

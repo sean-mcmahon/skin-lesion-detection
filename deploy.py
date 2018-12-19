@@ -3,34 +3,9 @@ from classifier import *
 from train_classifier import create_trainer
 import numpy as np
 
-def run_model(m, im, prepIm=None):
-    if prepIm:
-        # pytorch expects a batch dimension
-        im = np.expand_dims(prepIm(im), 0)
-    m.eval()
-    if hasattr(m, 'reset'):
-        m.reset()
-    p = to_np(m(VV(im))).squeeze()
-    return p, im
-
-
-def denorm_img(im, denorm_func):
-    # Convert from (bs, c, w, h) to (bs, w, h, c)
-    imd = np.rollaxis(im, 1, 4)
-    # denormalise, based on how you preprocess images for your model.
-    # Takes a np array and returns one.
-    imd = denorm_func(imd)
-    # Batch size (bs) should be 1, remove that for plotting.
-    # Also, values need to be between 0-255. Type change for PIL
-    imd = (imd.squeeze() * 255).astype(np.uint8)
-    # For encoding back to jpg byte array, BGR is expected.
-    # So reverse the channel dimension
-    imd = imd[:, :, ::-1]
-    return imd
-
 def load_segmentation():
     base_arch = resnet34
-    sz = 256
+    sz = 128
     _, vtfm = tfms_from_model(
         base_arch, sz, crop_type=CropType.NO, tfm_y=TfmType.NO)
     # denorm = vtfm.denorm
@@ -100,3 +75,31 @@ def load_bin_classifiers():
     sk_trainer = create_trainer(p_dict)
     sk_trainer.load('res_101_sk_multi_seg_pret_2018-12-17_2')
     return sk_trainer.learn.model, mel_trainer.learn.model, v_class_tfms
+
+
+def run_model(m, im, prepIm=None):
+    if prepIm:
+        im = prepIm(im)
+    # pytorch expects a batch dimension
+    im = np.expand_dims(im, 0) if im.ndim == 3 else im
+    m.eval()
+    if hasattr(m, 'reset'):
+        m.reset()
+    p = to_np(m(VV(im))).squeeze()
+    return p, im
+
+
+def denorm_img(im, denorm_func, reverse_ch=True):
+    # Convert from (bs, c, w, h) to (bs, w, h, c)
+    imd = np.rollaxis(im, 1, 4)
+    # denormalise, based on how you preprocess images for your model.
+    # Takes a np array and returns one.
+    imd = denorm_func(imd)
+    # Batch size (bs) should be 1, remove that for plotting.
+    # Also, values need to be between 0-255. Type change for PIL
+    imd = (imd.squeeze() * 255).astype(np.uint8)
+    # For encoding back to jpg byte array, BGR is expected.
+    # So reverse the channel dimension
+    if reverse_ch:
+        imd = imd[:, :, ::-1]
+    return imd

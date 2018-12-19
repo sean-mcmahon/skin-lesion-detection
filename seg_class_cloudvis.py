@@ -2,64 +2,13 @@ from segmenter import *
 from classifier import *
 from cloudvis import CloudVis, Request, Response
 from train_classifier import create_trainer
-from segment_cloudvis import denorm_img, run_model
-PORT = 6001
+from deploy import denorm_img, run_model, load_bin_classifiers, load_segmentation
 from PIL import Image
 import matplotlib.pyplot as plt
 
-def load_segmentation():
-    base_arch = resnet34
-    sz = 256
-    _, vtfm = tfms_from_model(base_arch, sz, crop_type=CropType.NO, tfm_y=TfmType.NO)
-    # denorm = vtfm.denorm
-    net = build_unet(base_arch)
-    weights = '/home/sean/src/docker_fastai/128unet_dermofit_isic17_1.h5'
-    if not os.path.isfile(weights): weights = '/app/128unet_dermofit_isic17_1.h5'
-    if not os.path.isfile(weights): raise FileNotFoundError(f'Invalid: {weights}')
-    load_model(net, weights) # loads weights to "net" - fastai function
-    return net, vtfm
-
-def load_classifier():
-    '''
-    There's more bloat around classification in fastai. 
-    Didn't have time to figure out how to condense it all.
-    '''
-    # Load Classifier
-    PATH = Path('/home/sean/src/docker_cloudvis')
-    if not PATH.exists(): PATH = Path('/app/')
-    arch = resnet101
-    im_size = 128
-    bs = 1
-    num_workers = 1
-    test_folder = None #'ISIC/ISIC-2017_Test_v2_Data_Classification/'
-    train_csv = PATH / 'train_multi_Mel_half.csv'
-    test_csv = None
-    # test_path = PATH / test_folder
-    # val_idx should be the last 150 images from the train csv
-    val_idx = None
-
-    params_file_name = 'blah'
-
-    weight_name = "res101_Mel_mutli_half_2018-12-11"
-
-    p_dict = {'path': PATH, 'arch': arch, 'sz': im_size,
-            'bs': bs, 'trn_csv': train_csv, 'sn': weight_name,
-            'test_csv': test_csv, 'test_folder': test_folder, 'val_idx': val_idx,
-            'precom': False, 'num_workers': num_workers, 'lr': 1e-2, 'aug_tfms': transforms_top_down,
-            'params_fn': params_file_name, 'precom': False}
-
-    _, v_class_tfms = tfms_from_model(arch, im_size, aug_tfms=p_dict['aug_tfms'])
-    # class_denorm = v_class_tfms.denorm
-
-    mel_trainer = create_trainer(p_dict)
-    mel_trainer.load('res_101_mel_multi_seg_pret_2018-12-18_2')
-    sk_trainer = create_trainer(p_dict)
-    sk_trainer.load('res_101_sk_multi_seg_pret_2018-12-17_2')
-    return sk_trainer.learn.model, mel_trainer.learn.model, v_class_tfms
-
-
+PORT = 6001
 net, vtfm = load_segmentation()
-sk_model, mel_model, v_class_tfms = load_classifier()
+sk_model, mel_model, v_class_tfms = load_bin_classifiers()
 
 
 def callback(request, response, data):
