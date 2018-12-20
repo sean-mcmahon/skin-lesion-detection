@@ -5,6 +5,13 @@ import subprocess
 import random
 import argparse
 
+'''
+Trains networks on the HPC, submits multiple jobs with different train, test and weight names.
+This is why there's a parameters file.
+
+Python2 script.
+'''
+
 
 def check_csv_names(csvlist, path):
     nl = [os.path.join(path, n ) for n in csvlist]

@@ -59,7 +59,11 @@ def plot_val_with_title(d, probs, preds, idxs, title):
     return plots(imgs, rows=1, titles=title_probs, figsize=(16, 8)) if len(imgs) > 0 else print('Not Found.')
 
 
-def load_csv_labels(csv_, folder='ISBI2016_ISIC_Part3_Test_Data', s='.jpg'):
+def load_csv_labels(csv_, folder, s='.jpg'):
+    '''
+    For loading the test set labels from test_csv.
+    csv_course is a Fastai function.
+    '''
     _, y, _ = csv_source(folder, csv_, suffix=s)
     print('Loading ys from csv; shape {}; vals {}; in folder "{}"'.format(
         y.shape, np.unique(y), folder))
@@ -67,29 +71,52 @@ def load_csv_labels(csv_, folder='ISBI2016_ISIC_Part3_Test_Data', s='.jpg'):
 
 
 def run_test(learner, ts=False, test_csv=None, sf=False,
-             tta=True, test_folder='ISBI2016_ISIC_Part3_Test_Data'):
+             tta=True, test_folder=None):
     '''
     Generate values for printing or plotting the three metrics:
     confusion matrix (cm)
-    ROC curve values
+    ROC curve values (Receiver Operating Characteristic)
     Accuracy value
     
-    Should work for binary and multi-task classification problems
+    Works for binary and multi-class classification problems.
+
+    learner - Fastai learner class (fastai/old/learner.py)
+    ts - test (bool)
+    test_csv - csv to load the labels from
+    sf - show figures
+    tta - test time augmentation, averages classifications across 5 augmentations of a single image.
+        Gets better performance, but takes longer to run. 
+    test_folder - the folder where the test_csv is within 'path'
+
+    returns:
+    final network classifications
+    y - Ground truth labels
+    acc - Accuracy
+    cm - confusion matrix
+    roc_auc - ROS area under curve for all classes
+    fpr - false positive rates
+    tpr - true positive rates
     '''
     if ts and test_csv is None:
         raise ValueError(
             'Need if running on testset, provide a test_csv file for labels')
+    if ts and test_folder is None:
+        raise ValueError(
+            'Need if running on testset, provide a test_folder where the test images are within PATH')
     if ts and not os.path.isfile(str(test_csv)): 
         raise FileNotFoundError(
             f'test_csv does not exist - "{test_csv}"')
     if tta:
+        # TTA method within fast ai learner
         log_preds, y = learner.TTA(is_test=ts)
         probs = np.exp(log_preds).mean(axis=0)  # average of TTA
     else:
         dl1 = learner.data.test_dl if ts else learner.data.val_dl
+        # from fastai - models.py
         log_preds, y = predict_with_targs(learner.model, dl1)
         probs = np.exp(log_preds)
     if ts and np.all(y == 0):
+        # My wrapper around fastai csv loading function
         y = load_csv_labels(csv_=test_csv, folder=test_folder)
     
     final_preds = np.argmax(probs, 1)
@@ -111,11 +138,21 @@ def run_test(learner, ts=False, test_csv=None, sf=False,
 
     if sf:
         print('-'*40)
+        # plot the performance figures
         performance_figs(learner.data.classes, cm, roc_auc, fpr, tpr)
     return final_preds, y, acc, cm, roc_auc, fpr, tpr
 
 
 def performance_figs(classes, cm, roc_auc, fpr, tpr):
+    '''
+    Plot the perforamance metrics for visualisation
+
+    classes - the class names used in the dataset
+    cm - confusion matrix
+    ros_auc - Receiver Operating Characteristic (ROC) - Area Under Curve
+    fpr - False positive rate
+    tpr - True positive rate
+    '''
     plot_confusion_matrix(cm, classes, cmap=plt.cm.Blues)
     for i in range(len(classes)):
         plt.figure()
@@ -137,6 +174,30 @@ class ClassifierTrainer():
     def __init__(self, path, arch, sz, bs, trn_csv, aug_tfms=transforms_top_down,
                   train_folder='', test_folder=None, val_idx=None, test_csv=None,
                  lr=1e-2, sn=None, num_workers=8, precom=False, params_fn=None, weights=None):
+        '''
+        Wrapper class around the fastai network training classes. Prints information about the training data,
+        Creates a data iterator, intialises the network leaner. Contains plotting evaluation and training methods.
+
+        path - path to directory where all the data is stored. Weights will also be saved an loaded to 'path/models'.
+        arch - the CNN architecture, usually resnet101. 'resnet101' is actually a handle for a fastai class which initalises the network in Pytorch.
+        sz - image size
+        bs - batch size, reduce if running out of memory
+        trn_csv - the csv file containing all the image names and their label. Two columns assumed, col 1 with image name relative to 'path' 
+            and col 2 with the labels as either numbers of strings
+        aug_tfms - agumentation transformations 
+        train_folder - the folder within 'path' containing the images, I usually leave this blank, opting to put the folder in col 1 of trn_csv.
+        test_folder - the folder within 'path' where the test images are, this is used to load the images into the network when testing.
+        test_csv - used by my weak wrapper around fastai code to get the testset labels.
+        val_idx - the  indexs within trn_csv for images in the valiation set. If None, a random selection of the training set will be used.
+        lr - Learning rate, 1e-2 should work most the time, try lowering to 1e-3, 1e-4 if training doesnt work. 
+        sn - Save name, the name to save the weighs to during training. Again weights saves as, path / "models" / sn .
+        precom - whether or not to precompute some CNN latent features before training. In general, dont use this. Here for historical reasons
+        num_workers - number of data loaders to intialise, keep within number of cpus on computer.
+        params_fn - filename of the parameters file, used when training on HPC so I know where to save the loss function plots too.
+        weights - If you want to initialise the CNN from a previou traininig session add the string. Otherwise ImageNet pre-training will be used.
+
+        Note. Fastai is a library built on top of the deep learning library Pytorch. 
+        '''
         self.arch = arch
         self.dlr = lr
         self.test_folder = test_folder
@@ -155,15 +216,19 @@ class ClassifierTrainer():
             print('Test set value counts')
             tst_df = pd.read_csv(path / test_csv)
             print(tst_df.iloc[:, -1].value_counts())
-        # Dataset augmentations
+        
+        # Dataset augmentations from fastai/old/fastai/transforms.py
         tfms = tfms_from_model(arch, sz, aug_tfms=transforms_top_down)
-        # The dataloader, used for training and evaluation, has numerous useful functions for:
+
+        # The Fastai dataloader, used for training and evaluation, has numerous useful functions for:
         # loading data, preprocessing, batching, obtaining basic stats, and more
         self.data = ImageClassifierData.from_csv(path, train_folder, trn_csv, tfms=tfms,
                                                  suffix='', bs=bs, test_name=self.test_folder,
                                                  val_idxs=val_idx, num_workers=num_workers)
         if self.test_folder: self.data.test_ds.fnames = sorted(self.data.test_ds.fnames)
         print('Dataset has: {} classes'.format(self.data.classes))
+
+        # Initialse the Fast ai Convolutional Neural Network (CNN or Conv) Learner. 
         self.learn = ConvLearner.pretrained(
             self.arch, self.data, precompute=precom)
 
@@ -171,27 +236,21 @@ class ClassifierTrainer():
             print('Loading weights "{}"'.format(weights))
             self.load(weights)
 
+        # If Cuda is true, we training on a GPU, which is what we want.
+        # If Cudnn is true our training should be slightly quicker.
         print('Cuda: {}; Cudnn {}'.format(
             torch.cuda.is_available(), torch.backends.cudnn.enabled))
+        # Can comment this if statement out if you want to train on a CPU.
         if not torch.cuda.is_available():
             raise Exception('Cuda not available ' + 'Cuda: {}; Cudnn {}'.format(
                 torch.cuda.is_available(), torch.backends.cudnn.enabled))
 
-    @classmethod
-    def from_data_loader(self, data_cls, arch, test_csv=None, prec=True, lr=1e-2, sn=None):
-        self.data = data_cls
-        self.arch = arch
-        self.dlr = lr
-        self.test_csv = test_csv
-        if sn is None:
-            self.sn = 'train_' + self.arch.__name__
-        else:
-            self.sn = sn
-        print('Dataset has: {} classes'.format(self.data.classes))
-        self.learn = ConvLearner.pretrained(
-            self.arch, self.data, precompute=prec)
-
     def lr_find(self, sf=True):
+        '''
+        Fastai method for determinining the initial learning rate.
+        This will generate a plot and you want the highest LR before the Loss starts to increase.
+        Usually wise to add a bit or margen between your chosen LR and where the Loss starts to increase.
+        '''
         lrf = self.learn.lr_find()
         if sf: self.learn.sched.plot()
         return lrf
@@ -200,6 +259,9 @@ class ClassifierTrainer():
         self.dlr = lr
 
     def init_fit(self, name=None):
+        '''
+        Some intial trainining. Don't have to use
+        '''
         sn = name if name else self.sn
         self.learn.fit(self.dlr, 2)
         self.learn.fit(self.dlr, 2, cycle_len=1)
@@ -210,6 +272,9 @@ class ClassifierTrainer():
         print('Saved weights as "{}"'.format(sn))
 
     def inter_fit(self, name=None):
+        '''
+        Some intermediate trainining. Don't have to use
+        '''
         sn = name if name else self.sn
         self.learn.precompute = False
         self.learn.fit(self.dlr, 2, cycle_len=1, cycle_mult=2)
@@ -218,6 +283,10 @@ class ClassifierTrainer():
         self.plot_training(sn)
 
     def final_fit(self, name=None):
+        '''
+        Some final trainining. Don't have to use. 
+        In fact for skin cancer, the models/networks tend to overfit during this training scheme. 
+        '''
         wd = 5e-4
         sn = name if name else self.sn
         self.learn.unfreeze()
@@ -230,10 +299,20 @@ class ClassifierTrainer():
         print('Saved weights as "{}"'.format(sn))
         
     def test_val(self, tta=False, sf=False):
+        '''
+        Test model on the validation set
+        Prints perforamnce metrics the return is for double checking and debugging.
+        returns predictions and performance metrics
+        '''
         *res, = run_test(self.learn, sf=sf, tta=tta)
         return res
 
     def test_eval(self, t_csv=None, tta=False, sf=False):
+        '''
+        Test model on the evaluation or test set
+        Prints perforamnce metrics the return is for double checking and debugging.
+        returns predictions and performance metrics
+        '''
         if t_csv: self.test_csv = t_csv
         if self.test_csv is None:
             print('no test labels given')
@@ -245,6 +324,10 @@ class ClassifierTrainer():
         return res
 
     def train(self, sn=None, lr=None):
+        '''
+        Overall training scheme I used when training models on the HPC. 
+        Would not reccomend for use in jupyter notebooks, too time consuming.
+        '''
         if lr: self.set_lr(lr)
         if sn: self.sn = sn
         
@@ -262,6 +345,11 @@ class ClassifierTrainer():
         self.test_eval(tta=True, sf=True)
 
     def load(self, fn, pc=False):
+        '''
+        Load the weights fn into the network.
+        learn.load is a fastai function.
+        pc - precompute
+        '''
         # if precompute set to True b default
         # but when loading models without precomute, it needs to be false.
         self.learn.precompute = pc
@@ -269,6 +357,10 @@ class ClassifierTrainer():
         # load_model(self.learn.model, self.get_model_path(name))
 
     def check_test_names(self, suf='.jpg'):
+        '''
+        Double check the labels and test images are loaded in the same order. 
+        Most of the time this is correct. 
+        '''
         def folder_and_name(path):
             folder_n = os.path.basename(os.path.dirname(path))
             fname = os.path.basename(path)
@@ -297,6 +389,10 @@ class ClassifierTrainer():
             raise Exception(RuntimeError(es))
 
     def plot_training(self, save_name):
+        '''
+        Saves a plot of the training and validation losses and the validation accuries to file. 
+        Optional.
+        '''
         def plot_loss(train_losses, val_losses, rec_metrics, num_ep, epoch_iters):
             fig, ax = plt.subplots(2, 1, figsize=(8, 12))
             ax[0].grid()
