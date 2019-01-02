@@ -4,6 +4,10 @@ from PIL import Image
 from deploy import run_model, denorm_img
 PORT = 6001
 
+'''
+By Sean McMahon - 2018
+'''
+
 base_arch = resnet34
 sz = 128
 _, vtfm = tfms_from_model(base_arch, sz, crop_type=CropType.NO, tfm_y=TfmType.NO)

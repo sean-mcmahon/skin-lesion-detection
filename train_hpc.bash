@@ -6,6 +6,8 @@
 #PBS -l gputype=M40
 #PBS -l walltime=4:00:00
 
+# By Sean McMahon 2018
+
 module load anaconda3/5.1.0
 
 cd ~/fastai/courses/projects
@@ -14,6 +16,8 @@ source activate fastai
 # cd /home/sean/src/fastai/courses/projects
 # conda activate fastai
 
+# This is the age old code for selecting a GPU ID on HPC. Written by Adam Tow 2015
+# Not sure if it's still needed, but it doesn't hurt.
 USEGPU='true'
 if [[ $(lsb_release -si) == *"SUSE"* ]]; then
     # On HPC (probably)

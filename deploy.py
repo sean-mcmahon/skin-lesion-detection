@@ -4,6 +4,9 @@ from classifier import *
 from train_classifier import create_trainer
 import numpy as np
 
+'''
+By Sean McMahon - 2018
+'''
 
 def load_segmentation(path='/ home/sean/src/docker_fastai/'):
     '''

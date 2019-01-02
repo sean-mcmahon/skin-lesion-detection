@@ -1,6 +1,10 @@
 from classifier import *
 import os
 
+'''
+By Sean McMahon - 2018
+'''
+
 PATH = Path('/home/sean/hpc-home/skin_cancer/')
 
 def getds(data): 

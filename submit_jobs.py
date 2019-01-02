@@ -10,6 +10,8 @@ Trains networks on the HPC, submits multiple jobs with different train, test and
 This is why there's a parameters file.
 
 Python2 script.
+
+By Sean McMahon 2018
 '''
 
 

@@ -4,16 +4,29 @@ import sklearn.metrics as metrics
 import os
 import matplotlib.pyplot as plt
 
+'''
+By Sean McMahon - 2018
+'''
+
 
 def rand_by_mask(mask, preds, mpl=4): 
+    '''
+    From Fastai Lesson 1. Make a random selection from the data.
+    '''
     return np.random.choice(np.where(mask)[0], min(len(preds), mpl), replace=False)
 
 
 def rand_by_correct(is_correct, preds, val_y): 
+    '''
+    From Fastai Lesson 1. Randomly select correct predictions
+    '''
     return rand_by_mask((preds == val_y)==is_correct, preds)
 
 
 def plots(ims, figsize=(12,6), rows=1, titles=None):
+    '''
+    Plots images in a subplot.
+    '''
     f = plt.figure(figsize=figsize)
     for i in range(len(ims)):
         sp = f.add_subplot(rows, len(ims)//rows, i+1)
@@ -23,6 +36,12 @@ def plots(ims, figsize=(12,6), rows=1, titles=None):
 
 
 def sample_ims(path, c, data_it, numimgs=9, figsize=(24, 12)):
+    '''
+    Based off code from Fastai lesson 1. Plots some random images for class c.
+    path - path to the dataset
+    c - the class index.
+    data_it - Fastai data iterator for loading data.
+    '''
     ys = data_it.trn_y
     ds = data_it.trn_ds
     cls2n = data_it.classes
@@ -37,20 +56,44 @@ def sample_ims(path, c, data_it, numimgs=9, figsize=(24, 12)):
 
 
 def load_img_id(path, ds, idx): 
+    '''
+    Loads an image.
+    path - path to the data set.
+    ds - dataset, a fastai class, different for different datasets and tasks
+    idx - the index number of the image to load.
+    '''
     return np.array(PIL.Image.open(str(path / ds.fnames[idx])))
 
 
 def most_by_mask(mask, mult, probs):
+    '''
+    Return the image indexes for the top four probabilites. From Fastai lesson 1.
+
+    probs - Network prediction probabilities (usually final logits after softmax)
+    mask  - used to select preds from certain class
+    mult  - used to either get the highest or lowest scores (1 or -1) from probs.
+    '''
     idxs = np.where(mask)[0]
     return idxs[np.argsort(mult * probs[idxs])[:4]]
 
 
 def most_by_correct(y, is_correct, preds, probs, val_y):
+    '''
+    Returns the 4 predictions with the highest probability per class. From Fastai lesson 1.
+    '''
     mult = -1 if (y == 1) == is_correct else 1
     return most_by_mask(((preds == val_y) == is_correct) & (val_y == y), mult, probs)
 
 
-def plot_val_with_title(d, probs, preds, idxs, title):
+def plot_val_with_title(d, probs, preds, idxs, title=''):
+    '''
+    Plots some images from the validation set with their class.
+    d     - dataset class instance. A fastai data. 
+    probs - Output probabilites from the network/model
+    preds - Final predictions from the model. Could just have probs as input and calculate preds, but meh.
+    idxs  - The indexs for the images to plot with classification results.
+
+    '''
     imgs = [load_img_id(d.path, d.val_ds, x) for x in idxs]
     p_str = '{}\nGT: {}\nPred: {}'
     title_probs = [p_str.format(round(

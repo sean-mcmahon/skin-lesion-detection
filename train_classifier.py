@@ -10,6 +10,9 @@ import json
 import datetime
 import argparse
 
+'''
+By Sean McMahon - 2018
+'''
 
 def create_trainer(params_dict):
     # I want a consistant class initialisation
