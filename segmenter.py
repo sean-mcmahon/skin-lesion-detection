@@ -145,7 +145,21 @@ class Unet34(nn.Module):
             sf.remove()
 
 
-def build_unet(backbone):
+class UnetModel():
+    '''
+    Provides some additional model information for FastAi Learner Class (used to train networks in FastAI).
+    Gives the different layer groups of UNet used to assigning different learning rates to different layers.
+    '''
+    def __init__(self, model, lr_cut, name='unet'):
+        self.model, self.name, = model, name
+        self.lr_cut = lr_cut
+
+    def get_layer_groups(self, precompute):
+        lgs = list(split_by_idxs(children(self.model.rn), [self.lr_cut]))
+        return lgs + [children(self.model)[1:]]
+
+
+def build_unet(backbone, return_cuts=False):
     '''
     Combines the above network construction code to build an instance of Unet34.
     backbone - Pytorch model (nn.Module), should be ResNet34 - 'resnet34' in fastai code
@@ -158,7 +172,11 @@ def build_unet(backbone):
     m_base = get_base(backbone, cut)
     unet = Unet34(m_base)
     # to_gpu will put model on gpu if one is available
-    return to_gpu(unet)
+    if return_cuts:
+        # This is needed to get layers groups for a Fastai Leaner Class.
+        return to_gpu(unet), lr_cut
+    else:
+        return to_gpu(unet)
 
 
 
@@ -257,6 +275,26 @@ def g_fns(fpath, ext='.png'):
     return np.array(sorted([f for f in fpath.glob('*'+ext)]))
 
 
+def get_all_files(p, fl='', ext='.png'):
+    '''
+    Gets all images within a directory 'p', uses a recursive search with os.walk().
+    p - directory to search
+    fl - filter for the names if '', no filter applied.
+    ext - the file extension.
+    
+    Returns ims - a list of all the filenames with ext and fl
+    '''
+    ims = []
+    for root, _, files in os.walk(p):
+        for fn in files:
+            if fn.endswith(ext) and fl in fn:
+                # The right filetype and the image we want!
+                ims.append(os.path.join(root, fn))
+    if len(ims) == 0:
+        print('No images found')
+    return ims
+
+
 def im_hist(fn, name='', path=None):
     '''
     Plots histogram of image sizes named in fn.
@@ -274,3 +312,34 @@ def im_hist(fn, name='', path=None):
     plt.hist(col_sz)
     plt.title(name + ' Col Distributions')
     print(f'Min row size {min(row_sz)}; Min col size {min(col_sz)}')
+
+
+def test_seg_net(learner, is_test=False, thres=0, pr=False):
+    '''
+    For testing Unet (A segmentation network - seg_net). 
+
+    learner is a FastAI Learner class containing unet and the data loader for the test and/or validation set
+    is_test - run on test of validation sest
+    thres - the threshold for lesion vs non-lesion classification
+    pr - print results flag
+
+    Returns, the accuracy, dice score, and a dict 'data' with the output logits, input x values and label masks.
+    '''
+    # Too slow, because it loops over the testset twice, once for logits and again for data.
+    logits = learner.predict(is_test=is_test)
+    dl = learner.data.test_dl if is_test else learner.data.val_dl
+    xs, ys = [], []
+    for xx, yy in iter(dl):
+        xs.append(to_np(xx))
+        ys.append(to_np(yy))
+    xs = np.concatenate(xs)
+    ys = np.concatenate(ys)
+
+    acc = accuracy_multi_np(logits, ys, thres)
+    d = dice_n(logits-thres, ys)
+    data = {'logits': logits, 'inputs': xs, 'labels': ys}
+    pstr = 'Accuracy = {:0.2f};  Dice = {:0.2f}  @ thres {}'.format(
+        float(acc), float(d), thres)
+    if pr:
+        print(pstr)
+    return acc, d, data
