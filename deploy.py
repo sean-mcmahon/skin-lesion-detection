@@ -8,7 +8,8 @@ import numpy as np
 By Sean McMahon - 2018
 '''
 
-def load_segmentation(path='/ home/sean/src/docker_fastai/'):
+
+def load_segmentation(path='/ home/sean/src/docker_fastai/', weight_name='128unet_dermofit_isic17_1.h5'):
     '''
     Loads a version of U-Net for semantic segmentation. 
 
@@ -24,10 +25,10 @@ def load_segmentation(path='/ home/sean/src/docker_fastai/'):
     # denorm = vtfm.denorm
     # this is my function lifted from one of the fastai tutorials. See segmenter.py
     net = build_unet(base_arch)
-    weights = os.path.join(str(path), 'models/128unet_dermofit_isic17_1.h5')
+    weights = os.path.join(str(path), 'models/' + weight_name)
     if not os.path.isfile(weights):
         # load weights in docker image. If running jupyter this does nothing
-        weights = '/app/128unet_dermofit_isic17_1.h5'
+        weights = '/app/' + weight_name
     if not os.path.isfile(weights):
         raise FileNotFoundError(f'Invalid: {weights}')
     # fastai function, Defined in fastai/old/fastai/torch_imports.py
@@ -39,6 +40,7 @@ def load_classifier(weights, trn_csv, sz=200, path='/home/sean/hpc-home/skin_can
     '''
     More general classifier loader than load_bin_classifiers().
     Make sure the path has the train csv and the weights somewhere in it. 
+    Train csv has to contain paths to a couple of valid images, due to time constraints could not write up a work around.
 
     reset101 is a pytorch model built by fastai. Use this by default
 
