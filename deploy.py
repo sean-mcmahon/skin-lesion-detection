@@ -26,9 +26,12 @@ def load_segmentation(path='/ home/sean/src/docker_fastai/', weight_name='128une
     # this is my function lifted from one of the fastai tutorials. See segmenter.py
     net = build_unet(base_arch)
     weights = os.path.join(str(path), 'models/' + weight_name)
+    weights = weights if weights.endswith('.h5') else weights + '.h5'
     if not os.path.isfile(weights):
         # load weights in docker image. If running jupyter this does nothing
-        weights = '/app/' + weight_name
+        if os.path.isdir('/app/'): 
+            # In docker image
+            weights = '/app/' + weight_name
     if not os.path.isfile(weights):
         raise FileNotFoundError(f'Invalid: {weights}')
     # fastai function, Defined in fastai/old/fastai/torch_imports.py
@@ -46,11 +49,14 @@ def load_classifier(weights, trn_csv, sz=200, path='/home/sean/hpc-home/skin_can
 
     Returns the pytorch network model and the image transformation function.
     '''
+    # fastai needs a validation set, as this is just depoyment, use a single image (the fourth in csv)
+    # if you're using an actual dataset, set this to None and fastai will automatically split it for you
+    val_idx = [3] 
     path = Path(path)  # the pathway to more paths
     if not path.exists(): raise FileNotFoundError(f'Invalid path "{path}"')
     p_dict = {'path': path, 'arch': arch, 'sz': sz,
             'bs': bs, 'trn_csv': path / trn_csv, 'sn': 'Unused: can be anything here',
-            'test_csv': None, 'test_folder': None, 'val_idx': None,
+            'test_csv': None, 'test_folder': None, 'val_idx': [3],
             'precom': False, 'num_workers': workers, 'lr': 1e-2, 'aug_tfms': transforms_top_down,
             'params_fn': 'dont matter', 'precom': False}
 

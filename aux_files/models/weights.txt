@@ -1,0 +1,4 @@
+The weights can be found at https://drive.google.com/open?id=1As0VTUIjdMZDIRdVxDaadOxmQoUw-geG
+
+res_101_class_multi_seg_pret_2018-12-17_2.h5 is the weights for the classification model
+128unet_dermofit_isic17_1.h5 is the weights for the segmentation model
